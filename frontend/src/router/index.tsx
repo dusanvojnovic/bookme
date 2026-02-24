@@ -1,11 +1,13 @@
+import { Typography } from '@mui/material';
 import {
 	createRootRoute,
 	createRoute,
 	createRouter,
 	Outlet,
+	redirect,
 } from '@tanstack/react-router';
-import { AppLayout } from '../layout/AppLayout';
 import { LoginPage } from '../pages/LoginPage';
+import { useAuthStore } from '../store/auth.store';
 
 const rootRoute = createRootRoute({
 	component: () => <Outlet />,
@@ -20,31 +22,24 @@ const loginRoute = createRoute({
 	component: LoginPage,
 });
 
-const appRoute = createRoute({
+const protectedRoute = createRoute({
 	getParentRoute: () => rootRoute,
-	id: 'app',
-	component: AppLayout,
+	id: 'protected',
+	beforeLoad: () => {
+		const token = useAuthStore.getState().token;
+		if (!token) throw redirect({ to: '/login' });
+	},
 });
 
-const indexRoute = createRoute({
-	getParentRoute: () => appRoute,
-	path: '/',
-	component: () => (
-		<div style={{ fontSize: 40, color: 'blue' }}>uindex page</div>
-	),
-});
-
-const smthRoute = createRoute({
-	getParentRoute: () => appRoute,
-	path: '/smth',
-	component: () => (
-		<div style={{ fontSize: 40, color: 'red' }}>some page</div>
-	),
+const dashboardRoute = createRoute({
+	getParentRoute: () => protectedRoute,
+	path: '/dashboard',
+	component: () => <Typography>DASHBOARD</Typography>,
 });
 
 const routeTree = rootRoute.addChildren([
 	loginRoute,
-	appRoute.addChildren([smthRoute, indexRoute]),
+	protectedRoute.addChildren([dashboardRoute]),
 ]);
 
 export const router = createRouter({ routeTree });
