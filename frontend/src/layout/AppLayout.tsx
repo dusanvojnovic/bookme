@@ -1,10 +1,15 @@
+import { Box, Typography } from '@mui/material';
 import { Outlet } from '@tanstack/react-router';
+import { Navbar } from '../components/shared/Navbar';
 
 export function AppLayout() {
 	return (
-		<div>
-			<div>layouuut</div>
-			<Outlet />
-		</div>
+		<Box>
+			<Navbar />
+			<Box sx={{ p: 2 }}>
+				<Typography variant="h6">Workly</Typography>
+				<Outlet />
+			</Box>
+		</Box>
 	);
 }
