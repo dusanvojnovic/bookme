@@ -1,5 +1,7 @@
+import { ServiceCategory } from "@prisma/client";
+
 export class CreateVenueDto {
-  category: string;
+  category: ServiceCategory;
   name: string;
   city: string;
   description?: string;

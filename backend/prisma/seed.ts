@@ -1,5 +1,5 @@
 import { PrismaPg } from '@prisma/adapter-pg';
-import { PrismaClient, UserRole } from '@prisma/client';
+import { PrismaClient, ServiceCategory, UserRole } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 import 'dotenv/config';
 import { Pool } from 'pg';
@@ -21,13 +21,17 @@ async function main() {
   await prisma.providerProfile.upsert({
     where: { userId: provider1.id },
     update: {},
-    create: { userId: provider1.id, companyName: 'Arena Sport Center' },
+    create: {
+      user: { connect: { id: provider1.id } },
+      companyName: 'Arena Sport Center',
+      serviceCategory: ServiceCategory.SPORT,
+    },
   });
 
   const venue = await prisma.venue.create({
     data: {
       providerId: provider1.id,
-      category: 'SPORT',
+      category: ServiceCategory.SPORT,
       name: 'Arena Sport Center',
       city: 'Belgrade',
       address: 'Dorcol 12',

@@ -1,6 +1,6 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
-import { UserRole } from '@prisma/client';
+import { ServiceCategory, UserRole } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../prisma/prisma.service';
 import { LoginDto } from './dto/login.dto';
@@ -33,10 +33,20 @@ export class AuthService {
     });
 
     if (role === UserRole.PROVIDER) {
+      if (!dto.serviceCategory) {
+        throw new BadRequestException('Service category is required');
+      }
+
+      const serviceCategory = dto.serviceCategory as ServiceCategory;
+      if (!Object.values(ServiceCategory).includes(serviceCategory)) {
+        throw new BadRequestException('Invalid service category');
+      }
+
       await this.prisma.providerProfile.create({
         data: {
           userId: user.id,
           companyName: dto.companyName ?? null,
+          serviceCategory,
         },
       });
     }

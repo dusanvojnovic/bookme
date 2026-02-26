@@ -25,6 +25,14 @@ enum BookingStatus {
     COMPLETED
 }
 
+enum ServiceCategory {
+    SPORT
+    BUSINESS
+    EVENTS
+    FOOD
+    WELLNESS
+}
+
 model User {
     id        String   @id @default(uuid())
     email     String   @unique
@@ -47,6 +55,7 @@ model ProviderProfile {
 
     companyName String?
     phone       String?
+    serviceCategory ServiceCategory
 
     createdAt DateTime @default(now())
 }
@@ -56,7 +65,7 @@ model Venue {
     providerId String
     provider   User   @relation("ProviderVenues", fields: [providerId], references: [id])
 
-    category    String // "SPORT" | "BUSINESS" | "FOOD" | "HEALTHCARE" | "WELLNESS" (može enum kasnije)
+    category    ServiceCategory
     name        String
     description String?
     city        String

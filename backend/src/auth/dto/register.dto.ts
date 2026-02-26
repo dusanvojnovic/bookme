@@ -3,4 +3,5 @@ export class RegisterDto {
   password: string;
   role?: 'customer' | 'provider';
   companyName?: string;
+  serviceCategory?: string;
 }

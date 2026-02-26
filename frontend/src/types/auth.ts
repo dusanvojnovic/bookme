@@ -19,6 +19,7 @@ export type RegisterPayload = {
 	password: string;
 	role: 'customer' | 'provider';
 	companyName?: string;
+	serviceCategory?: ServiceCategory;
 };
 
 export type Role = 'CUSTOMER' | 'PROVIDER';
@@ -27,6 +28,13 @@ export type AuthUser = {
 	id: string;
 	role: Role;
 };
+
+export type ServiceCategory =
+	| 'SPORT'
+	| 'BUSINESS'
+	| 'EVENTS'
+	| 'FOOD'
+	| 'WELLNESS';
 
 export type AuthStore = {
 	token: string | null;

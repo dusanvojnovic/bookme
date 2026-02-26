@@ -6,6 +6,7 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateVenueDto } from './dto/create-venue.dto';
 import { UpdateVenueDto } from './dto/update-venue.dto';
+import { ServiceCategory } from '@prisma/client';
 
 @Injectable()
 export class VenuesService {
@@ -67,7 +68,7 @@ export class VenuesService {
   listPublic(category?: string, city?: string, q?: string) {
     return this.prisma.venue.findMany({
       where: {
-        ...(category ? { category } : {}),
+        ...(category ? { category: category as ServiceCategory } : {}),
         ...(city ? { city } : {}),
         ...(q
           ? {
