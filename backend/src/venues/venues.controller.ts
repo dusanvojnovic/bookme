@@ -13,8 +13,10 @@ import {
 import { AuthGuard } from '@nestjs/passport';
 import { Roles } from '../auth/roles.decorator';
 import { RolesGuard } from '../auth/roles.guard';
+import { CreateUnitDto } from './dto/create-unit.dto';
 import { CreateVenueDto } from './dto/create-venue.dto';
 import { UpdateVenueDto } from './dto/update-venue.dto';
+import { UpdateVenueScheduleDto } from './dto/update-venue-schedule.dto';
 import { VenuesService } from './venues.service';
 
 export interface AuthUser {
@@ -37,7 +39,7 @@ export class VenuesController {
   }
 
   @Get('venues/:id')
-  getOne(@Param() id: string) {
+  getOne(@Param('id') id: string) {
     return this.venues.getById(id);
   }
 
@@ -71,5 +73,27 @@ export class VenuesController {
   @Delete('provider/venues/:id')
   remove(@Req() req: any) {
     return this.venues.remove(req.user.id, req.params.id);
+  }
+
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('PROVIDER')
+  @Post('provider/venues/:id/units')
+  createUnit(
+    @Req() req: Request & { user: AuthUser },
+    @Param('id') id: string,
+    @Body() dto: CreateUnitDto,
+  ) {
+    return this.venues.createUnit(req.user.id, id, dto);
+  }
+
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('PROVIDER')
+  @Patch('provider/venues/:id/schedule')
+  updateSchedule(
+    @Req() req: Request & { user: AuthUser },
+    @Param('id') id: string,
+    @Body() dto: UpdateVenueScheduleDto,
+  ) {
+    return this.venues.updateSchedule(req.user.id, id, dto);
   }
 }

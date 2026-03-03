@@ -4,8 +4,10 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { CreateUnitDto } from './dto/create-unit.dto';
 import { CreateVenueDto } from './dto/create-venue.dto';
 import { UpdateVenueDto } from './dto/update-venue.dto';
+import { UpdateVenueScheduleDto } from './dto/update-venue-schedule.dto';
 import { ServiceCategory } from '@prisma/client';
 
 @Injectable()
@@ -89,10 +91,57 @@ export class VenuesService {
         units: true,
         offerings: true,
         reviews: { take: 5 },
+        schedules: true,
       },
     });
 
     if (!venue) throw new NotFoundException('Venue not found');
     return venue;
+  }
+
+  async createUnit(providerId: string, venueId: string, dto: CreateUnitDto) {
+    const venue = await this.prisma.venue.findUnique({
+      where: { id: venueId },
+    });
+
+    if (!venue) throw new NotFoundException('Venue not found');
+    if (venue.providerId !== providerId)
+      throw new ForbiddenException('Not your venue');
+
+    return this.prisma.unit.create({
+      data: {
+        venueId,
+        name: dto.name,
+        unitType: dto.unitType,
+        capacity: dto.capacity ?? null,
+      },
+    });
+  }
+
+  async updateSchedule(
+    providerId: string,
+    venueId: string,
+    dto: UpdateVenueScheduleDto,
+  ) {
+    const venue = await this.prisma.venue.findUnique({
+      where: { id: venueId },
+    });
+
+    if (!venue) throw new NotFoundException('Venue not found');
+    if (venue.providerId !== providerId)
+      throw new ForbiddenException('Not your venue');
+
+    const entries = (dto.entries ?? []).map((entry) => ({
+      dayOfWeek: entry.dayOfWeek,
+      startTime: entry.startTime,
+      endTime: entry.endTime,
+    }));
+
+    return this.prisma.$transaction([
+      this.prisma.venueSchedule.deleteMany({ where: { venueId } }),
+      this.prisma.venueSchedule.createMany({
+        data: entries.map((entry) => ({ ...entry, venueId })),
+      }),
+    ]);
   }
 }
