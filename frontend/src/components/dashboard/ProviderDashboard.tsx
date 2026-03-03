@@ -12,6 +12,7 @@ import {
 	TextField,
 	Typography,
 } from '@mui/material';
+import { useNavigate } from '@tanstack/react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import * as React from 'react';
 import { api } from '../../api/api';
@@ -68,6 +69,7 @@ export function ProviderDashboard() {
 	const token = useAuthStore((s) => s.token);
 	const queryClient = useQueryClient();
 	const [form, setForm] = React.useState<CreateVenuePayload>(EMPTY_FORM);
+	const navigate = useNavigate();
 
 	const {
 		data = [],
@@ -323,6 +325,18 @@ export function ProviderDashboard() {
 										)}
 
 										<Stack direction="row" spacing={1}>
+											<Button
+												variant="contained"
+												size="small"
+												onClick={() =>
+													navigate({
+														to: '/venues/$venueId',
+														params: { venueId: venue.id },
+													})
+												}
+											>
+												Details
+											</Button>
 											<Button variant="outlined" size="small">
 												Units (soon)
 											</Button>

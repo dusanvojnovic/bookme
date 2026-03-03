@@ -9,6 +9,7 @@ import { AppLayout } from '../layout/AppLayout';
 import { DashboardPage } from '../pages/DashboardPage';
 import { LoginPage } from '../pages/LoginPage';
 import { RegisterPage } from '../pages/RegisterPage';
+import { VenueDetailsPage } from '../pages/VenueDetailsPage';
 import { useAuthStore } from '../store/auth.store';
 
 const rootRoute = createRootRoute({
@@ -52,10 +53,17 @@ const dashboardRoute = createRoute({
 	component: DashboardPage,
 });
 
+const venueDetailsRoute = createRoute({
+	getParentRoute: () => rootRoute,
+	path: '/venues/$venueId',
+	component: VenueDetailsPage,
+});
+
 const routeTree = rootRoute.addChildren([
 	indexRoute,
 	loginRoute,
 	registerRoute,
+	venueDetailsRoute,
 	protectedRoute.addChildren([dashboardRoute]),
 ]);
 
