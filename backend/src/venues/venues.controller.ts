@@ -43,6 +43,14 @@ export class VenuesController {
     return this.venues.getById(id);
   }
 
+  @Get('venues/:id/bookings')
+  getBookings(
+    @Param('id') id: string,
+    @Query('date') date: string,
+  ) {
+    return this.venues.getBookingsForDate(id, date);
+  }
+
   // PROVIDER
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles('PROVIDER')

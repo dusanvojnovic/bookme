@@ -149,4 +149,28 @@ export class VenuesService {
       }),
     ]);
   }
+
+  async getBookingsForDate(venueId: string, date: string) {
+    const day = new Date(date);
+    if (Number.isNaN(day.getTime())) return [];
+
+    const start = new Date(day);
+    start.setHours(0, 0, 0, 0);
+    const end = new Date(day);
+    end.setHours(23, 59, 59, 999);
+
+    return this.prisma.booking.findMany({
+      where: {
+        unit: { venueId },
+        startAt: { lt: end },
+        endAt: { gt: start },
+      },
+      select: {
+        id: true,
+        unitId: true,
+        startAt: true,
+        endAt: true,
+      },
+    });
+  }
 }
