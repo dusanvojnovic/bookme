@@ -6,4 +6,5 @@ export class CreateVenueDto {
   city: string;
   description?: string;
   address?: string;
+  slotStepMin?: number;
 }

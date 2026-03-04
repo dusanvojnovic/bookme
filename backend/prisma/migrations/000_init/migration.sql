@@ -28,7 +28,7 @@ CREATE TABLE "ProviderProfile" (
     "userId" TEXT NOT NULL,
     "companyName" TEXT,
     "phone" TEXT,
-    "serviceCategory" "ServiceCategory" NOT NULL,
+    "serviceCategory" "ServiceCategory" NOT NULL DEFAULT 'SPORT',
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "ProviderProfile_pkey" PRIMARY KEY ("id")
@@ -53,12 +53,12 @@ CREATE TABLE "Venue" (
 
 -- CreateTable
 CREATE TABLE "VenueSchedule" (
-    "id" TEXT NOT NULL,
+    "id" UUID NOT NULL DEFAULT gen_random_uuid(),
     "venueId" TEXT NOT NULL,
     "dayOfWeek" INTEGER NOT NULL,
     "startTime" TEXT NOT NULL,
     "endTime" TEXT NOT NULL,
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "createdAt" TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "VenueSchedule_pkey" PRIMARY KEY ("id")
 );
@@ -70,6 +70,9 @@ CREATE TABLE "Unit" (
     "name" TEXT NOT NULL,
     "unitType" TEXT NOT NULL,
     "capacity" INTEGER,
+    "minDurationMin" INTEGER,
+    "maxDurationMin" INTEGER,
+    "slotStepMin" INTEGER,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
 

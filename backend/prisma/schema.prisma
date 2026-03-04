@@ -55,7 +55,7 @@ model ProviderProfile {
 
     companyName String?
     phone       String?
-    serviceCategory ServiceCategory
+    serviceCategory ServiceCategory @default(SPORT)
 
     createdAt DateTime @default(now())
 }
@@ -70,6 +70,7 @@ model Venue {
     description String?
     city        String
     address     String?
+    slotStepMin Int?
 
     ratingAvg   Float @default(0)
     ratingCount Int   @default(0)
@@ -84,7 +85,7 @@ model Venue {
 }
 
 model VenueSchedule {
-    id        String  @id @default(uuid())
+    id        String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
     venueId   String
     venue     Venue   @relation(fields: [venueId], references: [id], onDelete: Cascade)
 
@@ -92,7 +93,7 @@ model VenueSchedule {
     startTime String  // "HH:mm"
     endTime   String  // "HH:mm"
 
-    createdAt DateTime @default(now())
+    createdAt DateTime @default(now()) @db.Timestamptz(6)
 
     @@index([venueId, dayOfWeek])
 }
@@ -105,6 +106,9 @@ model Unit {
     name     String
     unitType String // "TABLE" | "COURT" | "ROOM" | "DOCTOR" | "THERAPIST"...
     capacity Int?
+    minDurationMin Int?
+    maxDurationMin Int?
+    slotStepMin    Int?
 
     bookings Booking[]
     blocks   Block[]

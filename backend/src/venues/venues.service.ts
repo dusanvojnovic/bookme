@@ -23,6 +23,7 @@ export class VenuesService {
         city: dto.city,
         description: dto.description ?? null,
         address: dto.address ?? null,
+        slotStepMin: dto.slotStepMin ?? null,
       },
     });
   }
@@ -45,6 +46,7 @@ export class VenuesService {
         city: dto.city,
         description: dto.description,
         address: dto.address,
+        slotStepMin: dto.slotStepMin,
       },
     });
   }
@@ -114,6 +116,9 @@ export class VenuesService {
         name: dto.name,
         unitType: dto.unitType,
         capacity: dto.capacity ?? null,
+        minDurationMin: dto.minDurationMin ?? null,
+        maxDurationMin: dto.maxDurationMin ?? null,
+        slotStepMin: dto.slotStepMin ?? null,
       },
     });
   }
