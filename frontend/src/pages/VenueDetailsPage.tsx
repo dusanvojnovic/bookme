@@ -30,12 +30,16 @@ type UpdateVenuePayload = {
 	city?: string;
 	description?: string;
 	address?: string;
+	slotStepMin?: number;
 };
 
 type CreateUnitPayload = {
 	name: string;
 	unitType: string;
 	capacity?: number;
+	minDurationMin?: number;
+	maxDurationMin?: number;
+	slotStepMin?: number;
 };
 
 type ScheduleEntryPayload = {
@@ -121,12 +125,16 @@ export function VenueDetailsPage() {
 		address: '',
 		description: '',
 		category: '',
+		slotStepMin: undefined,
 	});
 
 	const [unitForm, setUnitForm] = React.useState({
 		name: '',
 		unitType: '',
 		capacity: '',
+		minDurationMin: '',
+		maxDurationMin: '',
+		slotStepMin: '',
 	});
 
 	const [repeatType, setRepeatType] = React.useState<
@@ -153,6 +161,7 @@ export function VenueDetailsPage() {
 			address: venue.address ?? '',
 			description: venue.description ?? '',
 			category: venue.category,
+			slotStepMin: venue.slotStepMin ?? undefined,
 		});
 
 		if (venue.schedules?.length) {
@@ -185,7 +194,14 @@ export function VenueDetailsPage() {
 		mutationFn: (payload: CreateUnitPayload) =>
 			createUnit(token!, venueId, payload),
 		onSuccess: () => {
-			setUnitForm({ name: '', unitType: '', capacity: '' });
+			setUnitForm({
+				name: '',
+				unitType: '',
+				capacity: '',
+				minDurationMin: '',
+				maxDurationMin: '',
+				slotStepMin: '',
+			});
 			queryClient.invalidateQueries({ queryKey: ['venue', venueId] });
 		},
 	});
@@ -331,6 +347,22 @@ export function VenueDetailsPage() {
 									</MenuItem>
 								))}
 							</Select>
+
+							<TextField
+								label="Slot step (min)"
+								type="number"
+								value={form.slotStepMin ?? ''}
+								onChange={(e) =>
+									setForm((prev) => ({
+										...prev,
+										slotStepMin: e.target.value
+											? Number(e.target.value)
+											: undefined,
+									}))
+								}
+								fullWidth
+								disabled={!isOwner}
+							/>
 						</Stack>
 
 						<Stack
@@ -379,6 +411,7 @@ export function VenueDetailsPage() {
 											description:
 												form.description?.trim() || undefined,
 											category: form.category?.trim(),
+											slotStepMin: form.slotStepMin,
 										})
 									}
 								>
@@ -642,6 +675,47 @@ export function VenueDetailsPage() {
 									fullWidth
 								/>
 							</Stack>
+							<Stack
+								direction={{ xs: 'column', md: 'row' }}
+								spacing={2}
+							>
+								<TextField
+									label="Min duration (min)"
+									type="number"
+									value={unitForm.minDurationMin}
+									onChange={(e) =>
+										setUnitForm((prev) => ({
+											...prev,
+											minDurationMin: e.target.value,
+										}))
+									}
+									fullWidth
+								/>
+								<TextField
+									label="Max duration (min)"
+									type="number"
+									value={unitForm.maxDurationMin}
+									onChange={(e) =>
+										setUnitForm((prev) => ({
+											...prev,
+											maxDurationMin: e.target.value,
+										}))
+									}
+									fullWidth
+								/>
+								<TextField
+									label="Slot step (min)"
+									type="number"
+									value={unitForm.slotStepMin}
+									onChange={(e) =>
+										setUnitForm((prev) => ({
+											...prev,
+											slotStepMin: e.target.value,
+										}))
+									}
+									fullWidth
+								/>
+							</Stack>
 							<Stack direction="row" spacing={1} alignItems="center">
 								<Button
 									variant="contained"
@@ -650,6 +724,15 @@ export function VenueDetailsPage() {
 										const capacity = unitForm.capacity.trim()
 											? Number(unitForm.capacity)
 											: undefined;
+										const minDurationMin = unitForm.minDurationMin.trim()
+											? Number(unitForm.minDurationMin)
+											: undefined;
+										const maxDurationMin = unitForm.maxDurationMin.trim()
+											? Number(unitForm.maxDurationMin)
+											: undefined;
+										const slotStepMin = unitForm.slotStepMin.trim()
+											? Number(unitForm.slotStepMin)
+											: undefined;
 
 										createUnitMutation.mutate({
 											name: unitForm.name.trim(),
@@ -657,6 +740,15 @@ export function VenueDetailsPage() {
 											capacity: Number.isNaN(capacity)
 												? undefined
 												: capacity,
+											minDurationMin: Number.isNaN(minDurationMin)
+												? undefined
+												: minDurationMin,
+											maxDurationMin: Number.isNaN(maxDurationMin)
+												? undefined
+												: maxDurationMin,
+											slotStepMin: Number.isNaN(slotStepMin)
+												? undefined
+												: slotStepMin,
 										});
 									}}
 								>
@@ -678,24 +770,52 @@ export function VenueDetailsPage() {
 							No units yet.
 						</Typography>
 					) : (
-						<Stack spacing={1.5}>
+						<Stack spacing={1}>
+							<Box
+								sx={{
+									display: 'grid',
+									gridTemplateColumns: '1.2fr 0.8fr 0.6fr 0.8fr 0.8fr 0.8fr',
+									gap: 1,
+									px: 1,
+									color: 'text.secondary',
+								}}
+							>
+								<Typography variant="caption">Name</Typography>
+								<Typography variant="caption">Type</Typography>
+								<Typography variant="caption">Capacity</Typography>
+								<Typography variant="caption">Min</Typography>
+								<Typography variant="caption">Max</Typography>
+								<Typography variant="caption">Step</Typography>
+							</Box>
+
 							{venue.units.map((unit) => (
 								<Paper key={unit.id} variant="outlined" sx={{ p: 1.5 }}>
-									<Stack
-										direction={{ xs: 'column', md: 'row' }}
-										justifyContent="space-between"
-										alignItems={{ md: 'center' }}
-										spacing={1}
+									<Box
+										sx={{
+											display: 'grid',
+											gridTemplateColumns:
+												'1.2fr 0.8fr 0.6fr 0.8fr 0.8fr 0.8fr',
+											gap: 1,
+											alignItems: 'center',
+										}}
 									>
 										<Typography fontWeight={700}>{unit.name}</Typography>
-										<Typography
-											variant="body2"
-											color="text.secondary"
-										>
+										<Typography variant="body2" color="text.secondary">
 											{unit.unitType}
-											{unit.capacity ? ` • ${unit.capacity} people` : ''}
 										</Typography>
-									</Stack>
+										<Typography variant="body2" color="text.secondary">
+											{unit.capacity ?? '—'}
+										</Typography>
+										<Typography variant="body2" color="text.secondary">
+											{unit.minDurationMin ?? '—'}
+										</Typography>
+										<Typography variant="body2" color="text.secondary">
+											{unit.maxDurationMin ?? '—'}
+										</Typography>
+										<Typography variant="body2" color="text.secondary">
+											{unit.slotStepMin ?? '—'}
+										</Typography>
+									</Box>
 								</Paper>
 							))}
 						</Stack>

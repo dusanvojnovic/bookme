@@ -14,6 +14,9 @@ export interface Unit {
 	name: string;
 	unitType: string;
 	capacity?: number | null;
+	minDurationMin?: number | null;
+	maxDurationMin?: number | null;
+	slotStepMin?: number | null;
 }
 
 export interface Offering {
@@ -40,6 +43,7 @@ export interface VenueDetails {
 	description?: string | null;
 	city: string;
 	address?: string | null;
+	slotStepMin?: number | null;
 	units: Unit[];
 	offerings: Offering[];
 	schedules: VenueSchedule[];
