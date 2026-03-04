@@ -4,6 +4,11 @@ import {
 	Alert,
 	Box,
 	Button,
+	Chip,
+	Dialog,
+	DialogActions,
+	DialogContent,
+	DialogTitle,
 	Snackbar,
 	Divider,
 	MenuItem,
@@ -18,6 +23,7 @@ import { Link, useNavigate, useParams } from '@tanstack/react-router';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import { TimePicker } from '@mui/x-date-pickers/TimePicker';
+import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import dayjs, { type Dayjs } from 'dayjs';
 import * as React from 'react';
 import { api } from '../api/api';
@@ -42,10 +48,28 @@ type CreateUnitPayload = {
 	slotStepMin?: number;
 };
 
+type UpdateUnitPayload = Partial<CreateUnitPayload>;
+
+type CreateOfferingPayload = {
+	name: string;
+	durationMin: number;
+	price?: number;
+	isActive?: boolean;
+};
+
+type UpdateOfferingPayload = Partial<CreateOfferingPayload>;
+
 type ScheduleEntryPayload = {
 	dayOfWeek: number;
 	startTime: string;
 	endTime: string;
+};
+
+type BookingSlot = {
+	id: string;
+	unitId: string;
+	startAt: string;
+	endAt: string;
 };
 
 const CATEGORY_OPTIONS = [
@@ -87,6 +111,70 @@ async function createUnit(
 	return res.data;
 }
 
+async function updateUnit(
+	token: string,
+	venueId: string,
+	unitId: string,
+	payload: UpdateUnitPayload,
+) {
+	const res = await api.patch<Unit>(
+		`/provider/venues/${venueId}/units/${unitId}`,
+		payload,
+		{
+			headers: { Authorization: `Bearer ${token}` },
+		},
+	);
+	return res.data;
+}
+
+async function deleteUnit(token: string, venueId: string, unitId: string) {
+	const res = await api.delete(`/provider/venues/${venueId}/units/${unitId}`, {
+		headers: { Authorization: `Bearer ${token}` },
+	});
+	return res.data;
+}
+
+async function createOffering(
+	token: string,
+	venueId: string,
+	payload: CreateOfferingPayload,
+) {
+	const res = await api.post(`/provider/venues/${venueId}/offerings`, payload, {
+		headers: { Authorization: `Bearer ${token}` },
+	});
+	return res.data;
+}
+
+async function updateOffering(
+	token: string,
+	venueId: string,
+	offeringId: string,
+	payload: UpdateOfferingPayload,
+) {
+	const res = await api.patch(
+		`/provider/venues/${venueId}/offerings/${offeringId}`,
+		payload,
+		{
+			headers: { Authorization: `Bearer ${token}` },
+		},
+	);
+	return res.data;
+}
+
+async function deleteOffering(
+	token: string,
+	venueId: string,
+	offeringId: string,
+) {
+	const res = await api.delete(
+		`/provider/venues/${venueId}/offerings/${offeringId}`,
+		{
+			headers: { Authorization: `Bearer ${token}` },
+		},
+	);
+	return res.data;
+}
+
 async function updateSchedule(
 	token: string,
 	venueId: string,
@@ -99,6 +187,13 @@ async function updateSchedule(
 			headers: { Authorization: `Bearer ${token}` },
 		},
 	);
+	return res.data;
+}
+
+async function fetchBookings(venueId: string, date: string) {
+	const res = await api.get<BookingSlot[]>(`/venues/${venueId}/bookings`, {
+		params: { date },
+	});
 	return res.data;
 }
 
@@ -154,6 +249,48 @@ export function VenueDetailsPage() {
 		ScheduleEntryPayload[]
 	>([]);
 
+	const [selectedUnitId, setSelectedUnitId] = React.useState('');
+	const [selectedOfferingId, setSelectedOfferingId] = React.useState('');
+	const [selectedDate, setSelectedDate] = React.useState<Dayjs | null>(
+		dayjs(),
+	);
+	const [editingUnitId, setEditingUnitId] = React.useState<string | null>(
+		null,
+	);
+	const [editingUnitForm, setEditingUnitForm] = React.useState({
+		name: '',
+		unitType: '',
+		capacity: '',
+		minDurationMin: '',
+		maxDurationMin: '',
+		slotStepMin: '',
+	});
+	const [unitToast, setUnitToast] = React.useState<{
+		message: string;
+		severity: 'success' | 'error';
+	} | null>(null);
+	const [deleteUnitId, setDeleteUnitId] = React.useState<string | null>(null);
+	const [offeringForm, setOfferingForm] = React.useState({
+		name: '',
+		durationMin: '',
+		price: '',
+	});
+	const [editingOfferingId, setEditingOfferingId] = React.useState<
+		string | null
+	>(null);
+	const [editingOfferingForm, setEditingOfferingForm] = React.useState({
+		name: '',
+		durationMin: '',
+		price: '',
+	});
+	const [offeringToast, setOfferingToast] = React.useState<{
+		message: string;
+		severity: 'success' | 'error';
+	} | null>(null);
+	const [deleteOfferingId, setDeleteOfferingId] = React.useState<
+		string | null
+	>(null);
+
 	React.useEffect(() => {
 		if (!venue) return;
 		setForm({
@@ -207,6 +344,80 @@ export function VenueDetailsPage() {
 		},
 	});
 
+	const updateUnitMutation = useMutation({
+		mutationFn: (payload: { unitId: string; data: UpdateUnitPayload }) =>
+			updateUnit(token!, venueId, payload.unitId, payload.data),
+		onSuccess: () => {
+			setEditingUnitId(null);
+			queryClient.invalidateQueries({ queryKey: ['venue', venueId] });
+		},
+	});
+
+	const deleteUnitMutation = useMutation({
+		mutationFn: (unitId: string) => deleteUnit(token!, venueId, unitId),
+		onSuccess: () => {
+			queryClient.invalidateQueries({ queryKey: ['venue', venueId] });
+			setUnitToast({ message: 'Unit deleted', severity: 'success' });
+		},
+		onError: () => {
+			setUnitToast({
+				message: 'Failed to delete unit',
+				severity: 'error',
+			});
+		},
+	});
+
+	const createOfferingMutation = useMutation({
+		mutationFn: (payload: CreateOfferingPayload) =>
+			createOffering(token!, venueId, payload),
+		onSuccess: () => {
+			setOfferingForm({
+				name: '',
+				durationMin: '',
+				price: '',
+			});
+			queryClient.invalidateQueries({ queryKey: ['venue', venueId] });
+			setOfferingToast({ message: 'Offering added', severity: 'success' });
+		},
+		onError: () => {
+			setOfferingToast({
+				message: 'Failed to add offering',
+				severity: 'error',
+			});
+		},
+	});
+
+	const updateOfferingMutation = useMutation({
+		mutationFn: (payload: { offeringId: string; data: UpdateOfferingPayload }) =>
+			updateOffering(token!, venueId, payload.offeringId, payload.data),
+		onSuccess: () => {
+			setEditingOfferingId(null);
+			queryClient.invalidateQueries({ queryKey: ['venue', venueId] });
+			setOfferingToast({ message: 'Offering updated', severity: 'success' });
+		},
+		onError: () => {
+			setOfferingToast({
+				message: 'Failed to update offering',
+				severity: 'error',
+			});
+		},
+	});
+
+	const deleteOfferingMutation = useMutation({
+		mutationFn: (offeringId: string) =>
+			deleteOffering(token!, venueId, offeringId),
+		onSuccess: () => {
+			queryClient.invalidateQueries({ queryKey: ['venue', venueId] });
+			setOfferingToast({ message: 'Offering deleted', severity: 'success' });
+		},
+		onError: () => {
+			setOfferingToast({
+				message: 'Failed to delete offering',
+				severity: 'error',
+			});
+		},
+	});
+
 	const updateScheduleMutation = useMutation({
 		mutationFn: (entries: ScheduleEntryPayload[]) =>
 			updateSchedule(token!, venueId, entries),
@@ -214,6 +425,68 @@ export function VenueDetailsPage() {
 			queryClient.invalidateQueries({ queryKey: ['venue', venueId] });
 		},
 	});
+
+	const dateParam = (selectedDate ?? dayjs()).format('YYYY-MM-DD');
+	const { data: bookings = [] } = useQuery({
+		queryKey: ['venue-bookings', venueId, dateParam],
+		queryFn: () => fetchBookings(venueId, dateParam),
+		enabled: !!selectedDate,
+		staleTime: 30_000,
+	});
+
+	const canSave =
+		isOwner &&
+		form.name?.trim() &&
+		form.city?.trim() &&
+		form.category?.trim();
+
+	const canAddUnit =
+		isOwner && unitForm.name.trim() && unitForm.unitType.trim();
+
+	const canAddOffering =
+		isOwner && offeringForm.name.trim() && String(offeringForm.durationMin).trim();
+
+	const canAddScheduleEntry =
+		isOwner && !!scheduleStart && !!scheduleEnd && selectedDays.length > 0;
+
+	const canSaveSchedule = isOwner && scheduleEntries.length > 0;
+
+	const units = venue?.units ?? [];
+	const offerings = venue?.offerings ?? [];
+	const activeOfferings = offerings.filter((offering) => offering.isActive);
+	const schedules = venue?.schedules ?? [];
+	const selectedUnit = units.find((u) => u.id === selectedUnitId);
+	const selectedOffering = activeOfferings.find(
+		(o) => o.id === selectedOfferingId,
+	);
+	const durationMin = selectedOffering?.durationMin ?? null;
+	const slotStepMin =
+		selectedUnit?.slotStepMin ?? venue?.slotStepMin ?? 30;
+	const dayOfWeek = selectedDate?.day();
+	const daySchedule = schedules.filter(
+		(entry) => entry.dayOfWeek === dayOfWeek,
+	);
+	const bookingsForUnit = bookings.filter(
+		(booking) => booking.unitId === selectedUnitId,
+	);
+	const availableSlots = React.useMemo(() => {
+		if (!durationMin || !selectedDate || !selectedUnitId) return [];
+		return generateAvailableSlots(
+			daySchedule,
+			slotStepMin,
+			durationMin,
+			bookingsForUnit,
+			dateParam,
+		);
+	}, [
+		daySchedule,
+		slotStepMin,
+		durationMin,
+		bookingsForUnit,
+		dateParam,
+		selectedDate,
+		selectedUnitId,
+	]);
 
 	if (isLoading) {
 		return (
@@ -232,20 +505,6 @@ export function VenueDetailsPage() {
 		);
 	}
 
-	const canSave =
-		isOwner &&
-		form.name?.trim() &&
-		form.city?.trim() &&
-		form.category?.trim();
-
-	const canAddUnit =
-		isOwner && unitForm.name.trim() && unitForm.unitType.trim();
-
-	const canAddScheduleEntry =
-		isOwner && !!scheduleStart && !!scheduleEnd && selectedDays.length > 0;
-
-	const canSaveSchedule = isOwner && scheduleEntries.length > 0;
-
 	return (
 		<Box sx={{ width: '100%', maxWidth: 1200, mt: 2 }}>
 			<Snackbar
@@ -263,6 +522,86 @@ export function VenueDetailsPage() {
 					Schedule saved successfully
 				</Alert>
 			</Snackbar>
+			{unitToast && (
+				<Snackbar
+					open
+					autoHideDuration={2500}
+					onClose={() => setUnitToast(null)}
+					anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+				>
+					<Alert
+						severity={unitToast.severity}
+						onClose={() => setUnitToast(null)}
+						sx={{ alignItems: 'center' }}
+					>
+						{unitToast.message}
+					</Alert>
+				</Snackbar>
+			)}
+			{offeringToast && (
+				<Snackbar
+					open
+					autoHideDuration={2500}
+					onClose={() => setOfferingToast(null)}
+					anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+				>
+					<Alert
+						severity={offeringToast.severity}
+						onClose={() => setOfferingToast(null)}
+						sx={{ alignItems: 'center' }}
+					>
+						{offeringToast.message}
+					</Alert>
+				</Snackbar>
+			)}
+			<Dialog
+				open={!!deleteUnitId}
+				onClose={() => setDeleteUnitId(null)}
+			>
+				<DialogTitle>Delete unit?</DialogTitle>
+				<DialogContent>
+					This action cannot be undone.
+				</DialogContent>
+				<DialogActions>
+					<Button onClick={() => setDeleteUnitId(null)}>Cancel</Button>
+					<Button
+						color="error"
+						variant="contained"
+						disabled={deleteUnitMutation.isPending}
+						onClick={() => {
+							if (!deleteUnitId) return;
+							deleteUnitMutation.mutate(deleteUnitId);
+							setDeleteUnitId(null);
+						}}
+					>
+						Delete
+					</Button>
+				</DialogActions>
+			</Dialog>
+			<Dialog
+				open={!!deleteOfferingId}
+				onClose={() => setDeleteOfferingId(null)}
+			>
+				<DialogTitle>Delete offering?</DialogTitle>
+				<DialogContent>
+					This action cannot be undone.
+				</DialogContent>
+				<DialogActions>
+					<Button onClick={() => setDeleteOfferingId(null)}>Cancel</Button>
+					<Button
+						color="error"
+						variant="contained"
+						disabled={deleteOfferingMutation.isPending}
+						onClick={() => {
+							if (!deleteOfferingId) return;
+							deleteOfferingMutation.mutate(deleteOfferingId);
+							setDeleteOfferingId(null);
+						}}
+					>
+						Delete
+					</Button>
+				</DialogActions>
+			</Dialog>
 			<Paper variant="outlined" sx={{ p: 2, borderRadius: 3, mb: 2 }}>
 				<Stack
 					direction={{ xs: 'column', md: 'row' }}
@@ -446,6 +785,115 @@ export function VenueDetailsPage() {
 						)}
 					</Stack>
 				</Paper>
+
+				{!isOwner && (
+					<Paper variant="outlined" sx={{ p: 2, borderRadius: 3 }}>
+						<Stack spacing={2}>
+							<Typography fontWeight={800}>Book a slot</Typography>
+
+							<Stack
+								direction={{ xs: 'column', md: 'row' }}
+								spacing={1.5}
+								alignItems={{ md: 'center' }}
+							>
+								<TextField
+									select
+									label="Unit"
+									value={selectedUnitId}
+									onChange={(e) =>
+										setSelectedUnitId(String(e.target.value))
+									}
+									size="small"
+									sx={{ minWidth: 200 }}
+								>
+									{venue.units.map((unit) => (
+										<MenuItem key={unit.id} value={unit.id}>
+											{unit.name}
+										</MenuItem>
+									))}
+								</TextField>
+
+								<TextField
+									select
+									label="Duration"
+									value={selectedOfferingId}
+									onChange={(e) =>
+										setSelectedOfferingId(String(e.target.value))
+									}
+									size="small"
+									sx={{ minWidth: 220 }}
+								>
+									{activeOfferings.map((offering) => (
+										<MenuItem key={offering.id} value={offering.id}>
+											{offering.name} ({offering.durationMin} min)
+										</MenuItem>
+									))}
+								</TextField>
+
+								<LocalizationProvider dateAdapter={AdapterDayjs}>
+									<DatePicker
+										label="Date"
+										value={selectedDate}
+										onChange={(value) => setSelectedDate(value)}
+										slotProps={{
+											textField: { size: 'small', sx: { minWidth: 180 } },
+										}}
+									/>
+								</LocalizationProvider>
+							</Stack>
+
+							{!venue.offerings.length ? (
+								<Typography variant="body2" color="text.secondary">
+									No offerings yet.
+								</Typography>
+							) : !selectedUnitId ? (
+								<Typography variant="body2" color="text.secondary">
+									Select a unit to see available slots.
+								</Typography>
+							) : !selectedOfferingId ? (
+								<Typography variant="body2" color="text.secondary">
+									Select a duration to see available slots.
+								</Typography>
+							) : !daySchedule.length ? (
+								<Typography variant="body2" color="text.secondary">
+									No working hours for this day.
+								</Typography>
+							) : (
+								<Stack spacing={1}>
+									<Typography variant="body2" color="text.secondary">
+										Available slots ({slotStepMin} min step)
+									</Typography>
+									<Box
+										sx={{
+											display: 'flex',
+											flexWrap: 'wrap',
+											gap: 1,
+										}}
+									>
+										{availableSlots.length === 0 ? (
+											<Typography
+												variant="body2"
+												color="text.secondary"
+											>
+												No available slots.
+											</Typography>
+										) : (
+											availableSlots.map((slot) => (
+												<Chip
+													key={slot}
+													label={slot}
+													size="small"
+													color="success"
+													variant="filled"
+												/>
+											))
+										)}
+									</Box>
+								</Stack>
+							)}
+						</Stack>
+					</Paper>
+				)}
 
 				<Paper variant="outlined" sx={{ p: 2, borderRadius: 3 }}>
 					<Stack spacing={2}>
@@ -761,16 +1209,16 @@ export function VenueDetailsPage() {
 									variant="contained"
 									disabled={!canAddUnit || createUnitMutation.isPending}
 									onClick={() => {
-										const capacity = unitForm.capacity.trim()
+										const capacity = String(unitForm.capacity).trim()
 											? Number(unitForm.capacity)
 											: undefined;
-										const minDurationMin = unitForm.minDurationMin.trim()
+										const minDurationMin = String(unitForm.minDurationMin).trim()
 											? Number(unitForm.minDurationMin)
 											: undefined;
-										const maxDurationMin = unitForm.maxDurationMin.trim()
+										const maxDurationMin = String(unitForm.maxDurationMin).trim()
 											? Number(unitForm.maxDurationMin)
 											: undefined;
-										const slotStepMin = unitForm.slotStepMin.trim()
+										const slotStepMin = String(unitForm.slotStepMin).trim()
 											? Number(unitForm.slotStepMin)
 											: undefined;
 
@@ -814,17 +1262,31 @@ export function VenueDetailsPage() {
 							<Box
 								sx={{
 									display: 'grid',
-									gridTemplateColumns: '1.2fr 0.8fr 0.6fr 0.9fr 0.9fr',
+									gridTemplateColumns:
+										'minmax(160px, 1.4fr) minmax(120px, 0.8fr) minmax(80px, 0.6fr) minmax(110px, 0.8fr) minmax(110px, 0.8fr) minmax(140px, 1fr)',
 									gap: 1,
 									px: 1,
 									color: 'text.secondary',
 								}}
 							>
-								<Typography variant="caption">Name</Typography>
-								<Typography variant="caption">Type</Typography>
-								<Typography variant="caption">Capacity</Typography>
-								<Typography variant="caption">Min duration</Typography>
-								<Typography variant="caption">Max duration</Typography>
+								<Typography variant="caption" noWrap>
+									Name
+								</Typography>
+								<Typography variant="caption" noWrap>
+									Type
+								</Typography>
+								<Typography variant="caption" noWrap align="right">
+									Capacity
+								</Typography>
+								<Typography variant="caption" noWrap align="right">
+									Min duration
+								</Typography>
+								<Typography variant="caption" noWrap align="right">
+									Max duration
+								</Typography>
+								<Typography variant="caption" noWrap align="right">
+									Actions
+								</Typography>
 							</Box>
 
 							{venue.units.map((unit) => (
@@ -833,24 +1295,191 @@ export function VenueDetailsPage() {
 										sx={{
 											display: 'grid',
 											gridTemplateColumns:
-												'1.2fr 0.8fr 0.6fr 0.9fr 0.9fr',
+												'minmax(160px, 1.4fr) minmax(120px, 0.8fr) minmax(80px, 0.6fr) minmax(110px, 0.8fr) minmax(110px, 0.8fr) minmax(140px, 1fr)',
 											gap: 1,
 											alignItems: 'center',
 										}}
 									>
-										<Typography fontWeight={700}>{unit.name}</Typography>
-										<Typography variant="body2" color="text.secondary">
-											{unit.unitType}
-										</Typography>
-										<Typography variant="body2" color="text.secondary">
-											{unit.capacity ?? '—'}
-										</Typography>
-										<Typography variant="body2" color="text.secondary">
-											{unit.minDurationMin ?? '—'}
-										</Typography>
-										<Typography variant="body2" color="text.secondary">
-											{unit.maxDurationMin ?? '—'}
-										</Typography>
+										{editingUnitId === unit.id ? (
+											<>
+												<TextField
+													size="small"
+													value={editingUnitForm.name}
+													onChange={(e) =>
+														setEditingUnitForm((prev) => ({
+															...prev,
+															name: e.target.value,
+														}))
+													}
+												/>
+												<TextField
+													size="small"
+													value={editingUnitForm.unitType}
+													onChange={(e) =>
+														setEditingUnitForm((prev) => ({
+															...prev,
+															unitType: e.target.value,
+														}))
+													}
+												/>
+												<TextField
+													size="small"
+													value={editingUnitForm.capacity}
+													onChange={(e) =>
+														setEditingUnitForm((prev) => ({
+															...prev,
+															capacity: e.target.value,
+														}))
+													}
+												/>
+												<TextField
+													size="small"
+													value={editingUnitForm.minDurationMin}
+													onChange={(e) =>
+														setEditingUnitForm((prev) => ({
+															...prev,
+															minDurationMin: e.target.value,
+														}))
+													}
+												/>
+												<TextField
+													size="small"
+													value={editingUnitForm.maxDurationMin}
+													onChange={(e) =>
+														setEditingUnitForm((prev) => ({
+															...prev,
+															maxDurationMin: e.target.value,
+														}))
+													}
+												/>
+											</>
+										) : (
+											<>
+												<Typography fontWeight={700} noWrap>
+													{unit.name}
+												</Typography>
+												<Typography
+													variant="body2"
+													color="text.secondary"
+													noWrap
+												>
+													{unit.unitType}
+												</Typography>
+												<Typography
+													variant="body2"
+													color="text.secondary"
+													align="right"
+												>
+													{unit.capacity ?? '—'}
+												</Typography>
+												<Typography
+													variant="body2"
+													color="text.secondary"
+													align="right"
+												>
+													{unit.minDurationMin ?? '—'}
+												</Typography>
+												<Typography
+													variant="body2"
+													color="text.secondary"
+													align="right"
+												>
+													{unit.maxDurationMin ?? '—'}
+												</Typography>
+											</>
+										)}
+										<Stack direction="row" spacing={1} justifyContent="flex-end">
+											{isOwner && editingUnitId !== unit.id && (
+												<Button
+													size="small"
+													onClick={() => {
+														setEditingUnitId(unit.id);
+														setEditingUnitForm({
+															name: unit.name,
+															unitType: unit.unitType,
+															capacity: String(unit.capacity ?? ''),
+															minDurationMin: String(
+																unit.minDurationMin ?? '',
+															),
+															maxDurationMin: String(
+																unit.maxDurationMin ?? '',
+															),
+															slotStepMin: String(
+																unit.slotStepMin ?? '',
+															),
+														});
+													}}
+												>
+													Edit
+												</Button>
+											)}
+											{isOwner && editingUnitId === unit.id && (
+												<>
+													<Button
+														size="small"
+														variant="contained"
+														disabled={updateUnitMutation.isPending}
+														onClick={() => {
+															const capacity = editingUnitForm.capacity.trim()
+																? Number(editingUnitForm.capacity)
+																: undefined;
+															const minDurationMin =
+																editingUnitForm.minDurationMin.trim()
+																	? Number(editingUnitForm.minDurationMin)
+																	: undefined;
+															const maxDurationMin =
+																editingUnitForm.maxDurationMin.trim()
+																	? Number(editingUnitForm.maxDurationMin)
+																	: undefined;
+															const slotStepMin =
+																editingUnitForm.slotStepMin.trim()
+																	? Number(editingUnitForm.slotStepMin)
+																	: undefined;
+
+															updateUnitMutation.mutate({
+																unitId: unit.id,
+																data: {
+																	name: editingUnitForm.name.trim(),
+																	unitType: editingUnitForm.unitType.trim(),
+																	capacity: Number.isNaN(capacity)
+																		? undefined
+																		: capacity,
+																	minDurationMin: Number.isNaN(minDurationMin)
+																		? undefined
+																		: minDurationMin,
+																	maxDurationMin: Number.isNaN(maxDurationMin)
+																		? undefined
+																		: maxDurationMin,
+																	slotStepMin: Number.isNaN(slotStepMin)
+																		? undefined
+																		: slotStepMin,
+																},
+															});
+														}}
+													>
+														Save
+													</Button>
+													<Button
+														size="small"
+														onClick={() => setEditingUnitId(null)}
+													>
+														Cancel
+													</Button>
+												</>
+											)}
+											{isOwner && (
+												<Button
+													size="small"
+													color="error"
+													disabled={deleteUnitMutation.isPending}
+													onClick={() => {
+														setDeleteUnitId(unit.id);
+													}}
+												>
+													Delete
+												</Button>
+											)}
+										</Stack>
 									</Box>
 								</Paper>
 							))}
@@ -873,37 +1502,277 @@ export function VenueDetailsPage() {
 
 					<Divider sx={{ my: 2 }} />
 
+					{isOwner && (
+						<Stack spacing={2} sx={{ mb: 2 }}>
+							<Typography fontWeight={700}>Add offering</Typography>
+							<Stack
+								direction={{ xs: 'column', md: 'row' }}
+								spacing={2}
+							>
+								<TextField
+									label="Name"
+									value={offeringForm.name}
+									onChange={(e) =>
+										setOfferingForm((prev) => ({
+											...prev,
+											name: e.target.value,
+										}))
+									}
+									fullWidth
+								/>
+								<TextField
+									select
+									label="Duration (min)"
+									value={offeringForm.durationMin}
+									onChange={(e) =>
+										setOfferingForm((prev) => ({
+											...prev,
+											durationMin: e.target.value,
+										}))
+									}
+									fullWidth
+								>
+									{[30, 45, 60, 90, 120, 150, 180].map((val) => (
+										<MenuItem key={val} value={val}>
+											{val}
+										</MenuItem>
+									))}
+								</TextField>
+								<TextField
+									label="Price (RSD)"
+									type="number"
+									value={offeringForm.price}
+									onChange={(e) =>
+										setOfferingForm((prev) => ({
+											...prev,
+											price: e.target.value,
+										}))
+									}
+									fullWidth
+								/>
+							</Stack>
+							<Stack direction="row" spacing={1} alignItems="center">
+								<Button
+									variant="contained"
+									disabled={!canAddOffering || createOfferingMutation.isPending}
+									onClick={() => {
+										const durationMin = String(
+											offeringForm.durationMin,
+										).trim()
+											? Number(offeringForm.durationMin)
+											: NaN;
+										const price = String(offeringForm.price).trim()
+											? Number(offeringForm.price)
+											: undefined;
+
+										if (
+											!offeringForm.name.trim() ||
+											Number.isNaN(durationMin)
+										) {
+											setOfferingToast({
+												message: 'Please fill name and duration',
+												severity: 'error',
+											});
+											return;
+										}
+
+										createOfferingMutation.mutate({
+											name: offeringForm.name.trim(),
+											durationMin,
+											price: Number.isNaN(price) ? undefined : price,
+										});
+									}}
+								>
+									Add offering
+								</Button>
+							</Stack>
+							<Divider />
+						</Stack>
+					)}
+
 					{venue.offerings.length === 0 ? (
 						<Typography variant="body2" color="text.secondary">
 							No offerings yet.
 						</Typography>
 					) : (
-						<Stack spacing={1.5}>
+						<Stack spacing={1}>
+							<Box
+								sx={{
+									display: 'grid',
+									gridTemplateColumns:
+										'minmax(160px, 1.6fr) minmax(120px, 0.7fr) minmax(110px, 0.7fr) minmax(140px, 1fr)',
+									gap: 1,
+									px: 1,
+									color: 'text.secondary',
+								}}
+							>
+								<Typography variant="caption" noWrap>
+									Name
+								</Typography>
+								<Typography variant="caption" noWrap align="right">
+									Duration
+								</Typography>
+								<Typography variant="caption" noWrap align="right">
+									Price
+								</Typography>
+								<Typography variant="caption" noWrap align="right">
+									Actions
+								</Typography>
+							</Box>
+
 							{venue.offerings.map((offering) => (
-								<Paper
-									key={offering.id}
-									variant="outlined"
-									sx={{ p: 1.5 }}
-								>
-									<Stack
-										direction={{ xs: 'column', md: 'row' }}
-										justifyContent="space-between"
-										alignItems={{ md: 'center' }}
-										spacing={1}
+								<Paper key={offering.id} variant="outlined" sx={{ p: 1.5 }}>
+									<Box
+										sx={{
+											display: 'grid',
+											gridTemplateColumns:
+												'minmax(160px, 1.6fr) minmax(120px, 0.7fr) minmax(110px, 0.7fr) minmax(140px, 1fr)',
+											gap: 1,
+											alignItems: 'center',
+										}}
 									>
-										<Typography fontWeight={700}>
-											{offering.name}
-										</Typography>
-										<Typography
-											variant="body2"
-											color="text.secondary"
-										>
-											{offering.durationMin} min
-											{offering.price != null
-												? ` • €${offering.price}`
-												: ''}
-										</Typography>
-									</Stack>
+										{editingOfferingId === offering.id ? (
+											<>
+												<TextField
+													size="small"
+													value={editingOfferingForm.name}
+													onChange={(e) =>
+														setEditingOfferingForm((prev) => ({
+															...prev,
+															name: e.target.value,
+														}))
+													}
+												/>
+												<TextField
+													size="small"
+													select
+													value={editingOfferingForm.durationMin}
+													onChange={(e) =>
+														setEditingOfferingForm((prev) => ({
+															...prev,
+															durationMin: e.target.value,
+														}))
+													}
+												>
+													{[30, 45, 60, 90, 120, 150, 180].map((val) => (
+														<MenuItem key={val} value={val}>
+															{val}
+														</MenuItem>
+													))}
+												</TextField>
+												<TextField
+													size="small"
+													type="number"
+													value={editingOfferingForm.price}
+													onChange={(e) =>
+														setEditingOfferingForm((prev) => ({
+															...prev,
+															price: e.target.value,
+														}))
+													}
+												/>
+												<Stack direction="row" spacing={1} justifyContent="flex-end">
+													<Button
+														size="small"
+														variant="contained"
+														disabled={updateOfferingMutation.isPending}
+														onClick={() => {
+															const durationMin = String(
+																editingOfferingForm.durationMin,
+															).trim()
+																? Number(editingOfferingForm.durationMin)
+																: NaN;
+															const price = String(
+																editingOfferingForm.price,
+															).trim()
+																? Number(editingOfferingForm.price)
+																: undefined;
+
+															if (
+																!editingOfferingForm.name.trim() ||
+																Number.isNaN(durationMin)
+															) {
+																setOfferingToast({
+																	message: 'Please fill name and duration',
+																	severity: 'error',
+																});
+																return;
+															}
+
+															updateOfferingMutation.mutate({
+																offeringId: offering.id,
+																data: {
+																	name: editingOfferingForm.name.trim(),
+																	durationMin,
+																	price: Number.isNaN(price)
+																		? undefined
+																		: price,
+																},
+															});
+														}}
+													>
+														Save
+													</Button>
+													<Button
+														size="small"
+														onClick={() => setEditingOfferingId(null)}
+													>
+														Cancel
+													</Button>
+												</Stack>
+											</>
+										) : (
+											<>
+												<Typography fontWeight={700} noWrap>
+													{offering.name}
+												</Typography>
+												<Typography
+													variant="body2"
+													color="text.secondary"
+													align="right"
+												>
+													{offering.durationMin} min
+												</Typography>
+												<Typography
+													variant="body2"
+													color="text.secondary"
+													align="right"
+												>
+													{offering.price != null ? `${offering.price} RSD` : '—'}
+												</Typography>
+												<Stack direction="row" spacing={1} justifyContent="flex-end">
+													{isOwner && (
+														<Button
+															size="small"
+															onClick={() => {
+																setEditingOfferingId(offering.id);
+																setEditingOfferingForm({
+																	name: offering.name,
+																	durationMin: String(offering.durationMin),
+																	price:
+																		offering.price != null
+																			? String(offering.price)
+																			: '',
+																});
+															}}
+														>
+															Edit
+														</Button>
+													)}
+													{isOwner && (
+														<Button
+															size="small"
+															color="error"
+															disabled={deleteOfferingMutation.isPending}
+															onClick={() => setDeleteOfferingId(offering.id)}
+														>
+															Delete
+														</Button>
+													)}
+												</Stack>
+											</>
+										)}
+									</Box>
 								</Paper>
 							))}
 						</Stack>
@@ -917,4 +1786,61 @@ export function VenueDetailsPage() {
 function formatDay(day: number) {
 	const map = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 	return map[day] ?? String(day);
+}
+
+function generateAvailableSlots(
+	schedule: { startTime: string; endTime: string }[],
+	stepMin: number,
+	durationMin: number,
+	bookings: BookingSlot[],
+	date: string,
+) {
+	if (!schedule.length || stepMin <= 0 || durationMin <= 0) return [];
+
+	const slots = new Set<string>();
+
+	for (const entry of schedule) {
+		const start = toMinutes(entry.startTime);
+		const end = toMinutes(entry.endTime);
+		if (Number.isNaN(start) || Number.isNaN(end) || end <= start) continue;
+
+		for (let t = start; t + durationMin <= end; t += stepMin) {
+			const slot = fromMinutes(t);
+			if (!isSlotBooked(bookings, date, slot, durationMin)) {
+				slots.add(slot);
+			}
+		}
+	}
+
+	return Array.from(slots).sort((a, b) => a.localeCompare(b));
+}
+
+function isSlotBooked(
+	bookings: BookingSlot[],
+	date: string,
+	slot: string,
+	durationMin: number,
+) {
+	const slotStart = new Date(`${date}T${slot}:00`);
+	const slotEnd = new Date(slotStart.getTime() + durationMin * 60000);
+
+	return bookings.some((booking) => {
+		const start = new Date(booking.startAt);
+		const end = new Date(booking.endAt);
+		return start < slotEnd && end > slotStart;
+	});
+}
+
+function toMinutes(time: string) {
+	const [h, m] = time.split(':').map((v) => Number(v));
+	if (Number.isNaN(h) || Number.isNaN(m)) return NaN;
+	return h * 60 + m;
+}
+
+function fromMinutes(total: number) {
+	const h = Math.floor(total / 60)
+		.toString()
+		.padStart(2, '0');
+	const m = (total % 60).toString().padStart(2, '0');
+	return `${h}:${m}`;
 }

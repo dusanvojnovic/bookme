@@ -13,8 +13,9 @@ import {
 import { AuthGuard } from '@nestjs/passport';
 import { Roles } from '../auth/roles.decorator';
 import { RolesGuard } from '../auth/roles.guard';
-import { CreateUnitDto } from './dto/create-unit.dto';
+import { CreateUnitDto, UpdateUnitDto } from './dto/create-unit.dto';
 import { CreateVenueDto } from './dto/create-venue.dto';
+import { CreateOfferingDto, UpdateOfferingDto } from './dto/offering.dto';
 import { UpdateVenueDto } from './dto/update-venue.dto';
 import { UpdateVenueScheduleDto } from './dto/update-venue-schedule.dto';
 import { VenuesService } from './venues.service';
@@ -96,6 +97,29 @@ export class VenuesController {
 
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles('PROVIDER')
+  @Patch('provider/venues/:venueId/units/:unitId')
+  updateUnit(
+    @Req() req: Request & { user: AuthUser },
+    @Param('venueId') venueId: string,
+    @Param('unitId') unitId: string,
+    @Body() dto: UpdateUnitDto,
+  ) {
+    return this.venues.updateUnit(req.user.id, venueId, unitId, dto);
+  }
+
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('PROVIDER')
+  @Delete('provider/venues/:venueId/units/:unitId')
+  removeUnit(
+    @Req() req: Request & { user: AuthUser },
+    @Param('venueId') venueId: string,
+    @Param('unitId') unitId: string,
+  ) {
+    return this.venues.removeUnit(req.user.id, venueId, unitId);
+  }
+
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('PROVIDER')
   @Patch('provider/venues/:id/schedule')
   updateSchedule(
     @Req() req: Request & { user: AuthUser },
@@ -103,5 +127,39 @@ export class VenuesController {
     @Body() dto: UpdateVenueScheduleDto,
   ) {
     return this.venues.updateSchedule(req.user.id, id, dto);
+  }
+
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('PROVIDER')
+  @Post('provider/venues/:id/offerings')
+  createOffering(
+    @Req() req: Request & { user: AuthUser },
+    @Param('id') id: string,
+    @Body() dto: CreateOfferingDto,
+  ) {
+    return this.venues.createOffering(req.user.id, id, dto);
+  }
+
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('PROVIDER')
+  @Patch('provider/venues/:venueId/offerings/:offeringId')
+  updateOffering(
+    @Req() req: Request & { user: AuthUser },
+    @Param('venueId') venueId: string,
+    @Param('offeringId') offeringId: string,
+    @Body() dto: UpdateOfferingDto,
+  ) {
+    return this.venues.updateOffering(req.user.id, venueId, offeringId, dto);
+  }
+
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('PROVIDER')
+  @Delete('provider/venues/:venueId/offerings/:offeringId')
+  removeOffering(
+    @Req() req: Request & { user: AuthUser },
+    @Param('venueId') venueId: string,
+    @Param('offeringId') offeringId: string,
+  ) {
+    return this.venues.removeOffering(req.user.id, venueId, offeringId);
   }
 }
