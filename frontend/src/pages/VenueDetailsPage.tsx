@@ -14,7 +14,7 @@ import {
 	Typography,
 } from '@mui/material';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Link, useParams } from '@tanstack/react-router';
+import { Link, useNavigate, useParams } from '@tanstack/react-router';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import { TimePicker } from '@mui/x-date-pickers/TimePicker';
@@ -104,6 +104,7 @@ async function updateSchedule(
 
 export function VenueDetailsPage() {
 	const { venueId } = useParams({ from: '/venues/$venueId' });
+	const navigate = useNavigate();
 	const token = useAuthStore((s) => s.token);
 	const user = useAuthStore((s) => s.user);
 	const queryClient = useQueryClient();
@@ -246,7 +247,7 @@ export function VenueDetailsPage() {
 	const canSaveSchedule = isOwner && scheduleEntries.length > 0;
 
 	return (
-		<Box sx={{ width: '100%', maxWidth: 1200 }}>
+		<Box sx={{ width: '100%', maxWidth: 1200, mt: 2 }}>
 			<Snackbar
 				open={updateScheduleMutation.isSuccess}
 				autoHideDuration={2500}
@@ -285,6 +286,17 @@ export function VenueDetailsPage() {
 					<Stack direction="row" spacing={1}>
 						<Button component={Link} to="/dashboard" variant="outlined">
 							Back to dashboard
+						</Button>
+						<Button
+							variant="contained"
+							onClick={() =>
+								navigate({
+									to: '/venues/$venueId/calendar',
+									params: { venueId },
+								})
+							}
+						>
+							Open calendar
 						</Button>
 					</Stack>
 				</Stack>
@@ -349,8 +361,8 @@ export function VenueDetailsPage() {
 							</Select>
 
 							<TextField
+								select
 								label="Slot step (min)"
-								type="number"
 								value={form.slotStepMin ?? ''}
 								onChange={(e) =>
 									setForm((prev) => ({
@@ -362,7 +374,14 @@ export function VenueDetailsPage() {
 								}
 								fullWidth
 								disabled={!isOwner}
-							/>
+							>
+								{[15, 30, 45, 60].map((step) => (
+									<MenuItem key={step} value={step}>
+										{step}
+									</MenuItem>
+								))}
+								<MenuItem value="">No step</MenuItem>
+							</TextField>
 						</Stack>
 
 						<Stack
@@ -680,8 +699,8 @@ export function VenueDetailsPage() {
 								spacing={2}
 							>
 								<TextField
+									select
 									label="Min duration (min)"
-									type="number"
 									value={unitForm.minDurationMin}
 									onChange={(e) =>
 										setUnitForm((prev) => ({
@@ -690,10 +709,17 @@ export function VenueDetailsPage() {
 										}))
 									}
 									fullWidth
-								/>
+								>
+									{[30, 45, 60, 90, 120, 150, 180].map((val) => (
+										<MenuItem key={val} value={val}>
+											{val}
+										</MenuItem>
+									))}
+									<MenuItem value="">No min</MenuItem>
+								</TextField>
 								<TextField
+									select
 									label="Max duration (min)"
-									type="number"
 									value={unitForm.maxDurationMin}
 									onChange={(e) =>
 										setUnitForm((prev) => ({
@@ -702,10 +728,17 @@ export function VenueDetailsPage() {
 										}))
 									}
 									fullWidth
-								/>
+								>
+									{[30, 45, 60, 90, 120, 150, 180].map((val) => (
+										<MenuItem key={val} value={val}>
+											{val}
+										</MenuItem>
+									))}
+									<MenuItem value="">No max</MenuItem>
+								</TextField>
 								<TextField
+									select
 									label="Slot step (min)"
-									type="number"
 									value={unitForm.slotStepMin}
 									onChange={(e) =>
 										setUnitForm((prev) => ({
@@ -714,7 +747,14 @@ export function VenueDetailsPage() {
 										}))
 									}
 									fullWidth
-								/>
+								>
+									{[15, 30, 45, 60].map((val) => (
+										<MenuItem key={val} value={val}>
+											{val}
+										</MenuItem>
+									))}
+									<MenuItem value="">No step</MenuItem>
+								</TextField>
 							</Stack>
 							<Stack direction="row" spacing={1} alignItems="center">
 								<Button
@@ -774,7 +814,7 @@ export function VenueDetailsPage() {
 							<Box
 								sx={{
 									display: 'grid',
-									gridTemplateColumns: '1.2fr 0.8fr 0.6fr 0.8fr 0.8fr 0.8fr',
+									gridTemplateColumns: '1.2fr 0.8fr 0.6fr 0.9fr 0.9fr',
 									gap: 1,
 									px: 1,
 									color: 'text.secondary',
@@ -783,9 +823,8 @@ export function VenueDetailsPage() {
 								<Typography variant="caption">Name</Typography>
 								<Typography variant="caption">Type</Typography>
 								<Typography variant="caption">Capacity</Typography>
-								<Typography variant="caption">Min</Typography>
-								<Typography variant="caption">Max</Typography>
-								<Typography variant="caption">Step</Typography>
+								<Typography variant="caption">Min duration</Typography>
+								<Typography variant="caption">Max duration</Typography>
 							</Box>
 
 							{venue.units.map((unit) => (
@@ -794,7 +833,7 @@ export function VenueDetailsPage() {
 										sx={{
 											display: 'grid',
 											gridTemplateColumns:
-												'1.2fr 0.8fr 0.6fr 0.8fr 0.8fr 0.8fr',
+												'1.2fr 0.8fr 0.6fr 0.9fr 0.9fr',
 											gap: 1,
 											alignItems: 'center',
 										}}
@@ -811,9 +850,6 @@ export function VenueDetailsPage() {
 										</Typography>
 										<Typography variant="body2" color="text.secondary">
 											{unit.maxDurationMin ?? '—'}
-										</Typography>
-										<Typography variant="body2" color="text.secondary">
-											{unit.slotStepMin ?? '—'}
 										</Typography>
 									</Box>
 								</Paper>

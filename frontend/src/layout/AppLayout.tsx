@@ -34,6 +34,7 @@ export function AppLayout() {
 					alignItems: 'center',
 					justifyContent: 'center',
 					px: 2,
+					pt: 10,
 				}}
 			>
 				<Container sx={{ width: '100%' }}>
