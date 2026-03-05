@@ -72,8 +72,8 @@ export class VenuesService {
     });
   }
 
-  listPublic(category?: string, city?: string, q?: string) {
-    return this.prisma.venue.findMany({
+  async listPublic(category?: string, city?: string, q?: string) {
+    const venues = await this.prisma.venue.findMany({
       where: {
         ...(category ? { category: category as ServiceCategory } : {}),
         ...(city ? { city } : {}),
@@ -86,6 +86,28 @@ export class VenuesService {
             }
           : {}),
       },
+      include: {
+        _count: { select: { units: true, offerings: true } },
+        offerings: { select: { price: true }, where: { isActive: true } },
+      },
+    });
+
+    return venues.map((venue) => {
+      const prices = venue.offerings
+        .map((o) => o.price)
+        .filter((price): price is number => typeof price === 'number');
+      const priceFrom = prices.length ? Math.min(...prices) : null;
+
+      return {
+        id: venue.id,
+        name: venue.name,
+        category: venue.category,
+        city: venue.city,
+        address: venue.address,
+        unitsCount: venue._count.units,
+        offeringsCount: venue._count.offerings,
+        priceFrom,
+      };
     });
   }
 
