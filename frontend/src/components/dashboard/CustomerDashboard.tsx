@@ -76,7 +76,7 @@ export function CustomerDashboard() {
 				variant="outlined"
 				sx={{
 					p: 2,
-					borderRadius: 3,
+					borderRadius: 2,
 					position: { lg: 'sticky' },
 					top: { lg: 88 },
 					height: { lg: 'fit-content' },
@@ -188,6 +188,9 @@ export function CustomerDashboard() {
 							))}
 						</Stack>
 					</Stack>
+					<Button variant="outlined" fullWidth sx={{ mt: 2 }}>
+						Map (soon)
+					</Button>
 				</Stack>
 			</Paper>
 
@@ -197,7 +200,7 @@ export function CustomerDashboard() {
 					variant="outlined"
 					sx={{
 						p: 2,
-						borderRadius: 3,
+						borderRadius: 2,
 						mb: 2,
 						background:
 							'linear-gradient(135deg, rgba(255,255,255,0.04), rgba(255,255,255,0))',
@@ -219,7 +222,6 @@ export function CustomerDashboard() {
 						</Box>
 
 						<Stack direction="row" spacing={1}>
-							<Button variant="outlined">Map (soon)</Button>
 							<Button
 								variant="contained"
 								onClick={() => navigate({ to: '/my-bookings' })}
@@ -262,7 +264,7 @@ export function CustomerDashboard() {
 								<Paper
 									key={i}
 									variant="outlined"
-									sx={{ borderRadius: 3, overflow: 'hidden' }}
+									sx={{ borderRadius: 2, overflow: 'hidden' }}
 								>
 									<Skeleton
 										variant="rectangular"

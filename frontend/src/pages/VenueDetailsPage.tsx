@@ -671,7 +671,7 @@ export function VenueDetailsPage() {
 					</Button>
 				</DialogActions>
 			</Dialog>
-			<Paper variant="outlined" sx={{ p: 2, borderRadius: 3, mb: 2 }}>
+			<Paper variant="outlined" sx={{ p: 2, borderRadius: 2, mb: 2 }}>
 				<Stack
 					direction={{ xs: 'column', md: 'row' }}
 					justifyContent="space-between"
@@ -711,7 +711,7 @@ export function VenueDetailsPage() {
 			</Paper>
 
 			<Stack spacing={2}>
-				<Paper variant="outlined" sx={{ p: 2, borderRadius: 3 }}>
+				<Paper variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
 					<Stack spacing={2}>
 						<Typography fontWeight={800}>
 							{isOwner ? 'Edit venue' : 'Venue details'}
@@ -1131,7 +1131,7 @@ export function VenueDetailsPage() {
 					</Dialog>
 				)}
 
-				<Paper variant="outlined" sx={{ p: 2, borderRadius: 3 }}>
+				<Paper variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
 					<Stack spacing={2}>
 						<Typography fontWeight={800}>Opening hours</Typography>
 
@@ -1321,7 +1321,7 @@ export function VenueDetailsPage() {
 					</Stack>
 				</Paper>
 
-				<Paper variant="outlined" sx={{ p: 2, borderRadius: 3 }}>
+				<Paper variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
 					<Stack
 						direction={{ xs: 'column', md: 'row' }}
 						justifyContent="space-between"
@@ -1735,7 +1735,7 @@ export function VenueDetailsPage() {
 					)}
 				</Paper>
 
-				<Paper variant="outlined" sx={{ p: 2, borderRadius: 3 }}>
+				<Paper variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
 					<Stack
 						direction={{ xs: 'column', md: 'row' }}
 						justifyContent="space-between"

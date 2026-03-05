@@ -104,7 +104,7 @@ export function ProviderDashboard() {
 				variant="outlined"
 				sx={{
 					p: 2,
-					borderRadius: 3,
+					borderRadius: 2,
 					mb: 2,
 					background:
 						'linear-gradient(135deg, rgba(255,255,255,0.04), rgba(255,255,255,0))',
@@ -134,7 +134,7 @@ export function ProviderDashboard() {
 			</Paper>
 
 			<Stack spacing={2}>
-				<Paper variant="outlined" sx={{ p: 2, borderRadius: 3 }}>
+				<Paper variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
 					<Stack spacing={2}>
 						<Typography fontWeight={800}>New venue</Typography>
 
@@ -250,7 +250,7 @@ export function ProviderDashboard() {
 					</Stack>
 				</Paper>
 
-				<Paper variant="outlined" sx={{ p: 2, borderRadius: 3 }}>
+				<Paper variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
 					<Stack
 						direction={{ xs: 'column', md: 'row' }}
 						justifyContent="space-between"
