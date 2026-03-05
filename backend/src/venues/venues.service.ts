@@ -1,10 +1,12 @@
 import {
+  BadRequestException,
   ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateUnitDto, UpdateUnitDto } from './dto/create-unit.dto';
+import { CreateBookingDto } from './dto/create-booking.dto';
 import { CreateVenueDto } from './dto/create-venue.dto';
 import { CreateOfferingDto, UpdateOfferingDto } from './dto/offering.dto';
 import { UpdateVenueDto } from './dto/update-venue.dto';
@@ -292,4 +294,123 @@ export class VenuesService {
       },
     });
   }
+
+  async createBooking(
+    customerId: string,
+    venueId: string,
+    dto: CreateBookingDto,
+  ) {
+    const unit = await this.prisma.unit.findUnique({
+      where: { id: dto.unitId },
+    });
+    if (!unit || unit.venueId !== venueId)
+      throw new NotFoundException('Unit not found');
+
+    const offering = await this.prisma.offering.findUnique({
+      where: { id: dto.offeringId },
+    });
+    if (!offering || offering.venueId !== venueId)
+      throw new NotFoundException('Offering not found');
+
+    const startAt = new Date(dto.startAt);
+    if (Number.isNaN(startAt.getTime()))
+      throw new BadRequestException('Invalid start time');
+
+    const endAt = new Date(
+      startAt.getTime() + offering.durationMin * 60_000,
+    );
+
+    if (startAt.toDateString() !== endAt.toDateString()) {
+      throw new BadRequestException('Booking cannot cross day boundary');
+    }
+
+    const dayOfWeek = startAt.getDay();
+    const schedules = await this.prisma.venueSchedule.findMany({
+      where: { venueId, dayOfWeek },
+    });
+    if (!schedules.length)
+      throw new BadRequestException('No working hours for this day');
+
+    const startMin = startAt.getHours() * 60 + startAt.getMinutes();
+    const endMin = endAt.getHours() * 60 + endAt.getMinutes();
+    const fitsSchedule = schedules.some((entry) => {
+      const scheduleStart = toMinutes(entry.startTime);
+      const scheduleEnd = toMinutes(entry.endTime);
+      return (
+        !Number.isNaN(scheduleStart) &&
+        !Number.isNaN(scheduleEnd) &&
+        scheduleStart <= startMin &&
+        scheduleEnd >= endMin
+      );
+    });
+
+    if (!fitsSchedule)
+      throw new BadRequestException('Slot is outside working hours');
+
+    const overlappingBooking = await this.prisma.booking.findFirst({
+      where: {
+        unitId: dto.unitId,
+        status: { not: 'CANCELLED' },
+        startAt: { lt: endAt },
+        endAt: { gt: startAt },
+      },
+      select: { id: true },
+    });
+    if (overlappingBooking)
+      throw new BadRequestException('Slot is not available');
+
+    const overlappingBlock = await this.prisma.block.findFirst({
+      where: {
+        unitId: dto.unitId,
+        startAt: { lt: endAt },
+        endAt: { gt: startAt },
+      },
+      select: { id: true },
+    });
+    if (overlappingBlock)
+      throw new BadRequestException('Slot is not available');
+
+    return this.prisma.booking.create({
+      data: {
+        unitId: dto.unitId,
+        offeringId: dto.offeringId,
+        customerId,
+        startAt,
+        endAt,
+        status: 'CONFIRMED',
+        partySize: dto.partySize ?? null,
+        notes: dto.notes ?? null,
+      },
+    });
+  }
+
+  listCustomerBookings(customerId: string) {
+    return this.prisma.booking.findMany({
+      where: { customerId },
+      orderBy: { startAt: 'asc' },
+      include: {
+        unit: {
+          select: {
+            id: true,
+            name: true,
+            venue: { select: { id: true, name: true, city: true, address: true } },
+          },
+        },
+        offering: {
+          select: {
+            id: true,
+            name: true,
+            durationMin: true,
+            price: true,
+          },
+        },
+      },
+    });
+  }
+}
+
+function toMinutes(time: string) {
+  const [h, m] = time.split(':').map((v) => Number(v));
+  if (Number.isNaN(h) || Number.isNaN(m)) return NaN;
+  return h * 60 + m;
 }

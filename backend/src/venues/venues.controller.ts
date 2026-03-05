@@ -15,6 +15,7 @@ import { Roles } from '../auth/roles.decorator';
 import { RolesGuard } from '../auth/roles.guard';
 import { CreateUnitDto, UpdateUnitDto } from './dto/create-unit.dto';
 import { CreateVenueDto } from './dto/create-venue.dto';
+import { CreateBookingDto } from './dto/create-booking.dto';
 import { CreateOfferingDto, UpdateOfferingDto } from './dto/offering.dto';
 import { UpdateVenueDto } from './dto/update-venue.dto';
 import { UpdateVenueScheduleDto } from './dto/update-venue-schedule.dto';
@@ -50,6 +51,24 @@ export class VenuesController {
     @Query('date') date: string,
   ) {
     return this.venues.getBookingsForDate(id, date);
+  }
+
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('CUSTOMER')
+  @Post('venues/:id/bookings')
+  createBooking(
+    @Req() req: Request & { user: AuthUser },
+    @Param('id') id: string,
+    @Body() dto: CreateBookingDto,
+  ) {
+    return this.venues.createBooking(req.user.id, id, dto);
+  }
+
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('CUSTOMER')
+  @Get('customer/bookings')
+  listCustomerBookings(@Req() req: Request & { user: AuthUser }) {
+    return this.venues.listCustomerBookings(req.user.id);
   }
 
   // PROVIDER
