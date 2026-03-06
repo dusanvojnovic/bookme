@@ -1,29 +1,30 @@
-import LocationOnIcon from '@mui/icons-material/LocationOn';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import LocationOnIcon from '@mui/icons-material/LocationOn';
 import {
-	Alert,
-	Box,
-	Button,
-	Chip,
-	Dialog,
-	DialogActions,
-	DialogContent,
-	DialogTitle,
-	Snackbar,
-	Divider,
-	MenuItem,
-	Paper,
-	Select,
-	Stack,
-	TextField,
-	Typography,
+    Alert,
+    Box,
+    Button,
+    Chip,
+    Dialog,
+    DialogActions,
+    DialogContent,
+    DialogTitle,
+    Divider,
+    MenuItem,
+    Paper,
+    Select,
+    Snackbar,
+    Stack,
+    TextField,
+    Typography,
 } from '@mui/material';
+import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
+import { DatePicker } from '@mui/x-date-pickers/DatePicker';
+import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
+import { TimePicker } from '@mui/x-date-pickers/TimePicker';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useNavigate, useParams } from '@tanstack/react-router';
-import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
-import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
-import { TimePicker } from '@mui/x-date-pickers/TimePicker';
-import { DatePicker } from '@mui/x-date-pickers/DatePicker';
+import axios from 'axios';
 import dayjs, { type Dayjs } from 'dayjs';
 import * as React from 'react';
 import { api } from '../api/api';
@@ -272,6 +273,8 @@ export function VenueDetailsPage() {
 	const [selectedDate, setSelectedDate] = React.useState<Dayjs | null>(null);
 	const [selectedSlot, setSelectedSlot] = React.useState<string | null>(null);
 	const [bookingDialogOpen, setBookingDialogOpen] = React.useState(false);
+	const [bookingAttempted, setBookingAttempted] = React.useState(false);
+	const [bookingError, setBookingError] = React.useState<string | null>(null);
 	const [requestedSlot, setRequestedSlot] = React.useState<{
 		slot: string;
 		date: string;
@@ -468,11 +471,19 @@ export function VenueDetailsPage() {
 				message: 'Uspesno ste rezervisali termin.',
 				severity: 'success',
 			});
+			setBookingAttempted(false);
+			setBookingError(null);
 			navigate({ to: '/my-bookings' });
 		},
 		onError: (error) => {
-			const message =
-				error instanceof Error ? error.message : 'Failed to create booking';
+			const message = axios.isAxiosError(error)
+				? Array.isArray(error.response?.data?.message)
+					? error.response?.data?.message.join(', ')
+					: error.response?.data?.message || error.message
+				: error instanceof Error
+					? error.message
+					: 'Failed to create booking';
+			setBookingError(message);
 			setBookingToast({ message, severity: 'error' });
 		},
 	});
@@ -543,6 +554,56 @@ export function VenueDetailsPage() {
 	React.useEffect(() => {
 		setSelectedSlot(null);
 	}, [selectedUnitId, selectedOfferingId, selectedDate]);
+
+	React.useEffect(() => {
+		if (bookingError) setBookingError(null);
+	}, [selectedUnitId, selectedOfferingId, selectedDate, selectedSlot, bookingError]);
+
+	const resetBookingForm = () => {
+		setSelectedUnitId('');
+		setSelectedOfferingId('');
+		setSelectedDate(null);
+		setSelectedSlot(null);
+		setBookingAttempted(false);
+		setBookingError(null);
+	};
+
+	const canSubmitBooking =
+		!!token &&
+		!!selectedDate &&
+		!!selectedUnitId &&
+		!!selectedOfferingId &&
+		!!selectedSlot;
+
+	const handleReserve = () => {
+		setBookingAttempted(true);
+		setBookingError(null);
+		if (!token) {
+			setBookingError('Please log in to book a slot');
+			return;
+		}
+		if (
+			!selectedDate ||
+			!selectedUnitId ||
+			!selectedOfferingId ||
+			!selectedSlot
+		) {
+			return;
+		}
+
+		createBookingMutation.mutate({
+			unitId: selectedUnitId,
+			offeringId: selectedOfferingId,
+			startAt: `${dateParam}T${selectedSlot}:00`,
+		});
+	};
+
+	React.useEffect(() => {
+		if (!bookingDialogOpen) {
+			setBookingAttempted(false);
+			setBookingError(null);
+		}
+	}, [bookingDialogOpen]);
 
 	if (isLoading) {
 		return (
@@ -871,23 +932,38 @@ export function VenueDetailsPage() {
 				{!isOwner && (
 					<Dialog
 						open={bookingDialogOpen}
-						onClose={() => setBookingDialogOpen(false)}
+						onClose={() => {
+							resetBookingForm();
+							setBookingDialogOpen(false);
+						}}
 						fullWidth
 						maxWidth="md"
 					>
 						<DialogTitle>Reserve a slot</DialogTitle>
 						<DialogContent sx={{ pt: 2 }}>
 							<Stack spacing={2}>
+								{bookingError && (
+									<Alert severity="error">{bookingError}</Alert>
+								)}
+								{!token && (
+									<Alert severity="warning">
+										Log in to reserve a slot.
+									</Alert>
+								)}
 								<Stack
 									direction={{ xs: 'column', md: 'row' }}
 									spacing={1.5}
 									alignItems={{ md: 'center' }}
 								>
 									{selectedUnitId && selectedUnit ? (
-										<Box sx={{ minWidth: 200 }}>
-											<Typography variant="caption" color="text.secondary">
-												Unit
-											</Typography>
+										<Box
+											sx={{
+												minWidth: 200,
+												height: 40,
+												display: 'flex',
+												alignItems: 'center',
+											}}
+										>
 											<Typography fontWeight={700}>
 												{selectedUnit.name}
 											</Typography>
@@ -902,6 +978,12 @@ export function VenueDetailsPage() {
 											}
 											size="small"
 											sx={{ minWidth: 200 }}
+											error={bookingAttempted && !selectedUnitId}
+											helperText={
+												bookingAttempted && !selectedUnitId
+													? 'Select a unit'
+													: ' '
+											}
 										>
 											{venue.units.map((unit) => (
 												<MenuItem key={unit.id} value={unit.id}>
@@ -919,7 +1001,16 @@ export function VenueDetailsPage() {
 											setSelectedOfferingId(String(e.target.value))
 										}
 										size="small"
-										sx={{ minWidth: 220 }}
+                                        sx={{ minWidth: 220, marginTop: 2 }}
+										disabled={!activeOfferings.length}
+										error={bookingAttempted && !selectedOfferingId}
+										helperText={
+											!activeOfferings.length
+												? 'No active offerings'
+												: bookingAttempted && !selectedOfferingId
+													? 'Select a duration'
+													: ' '
+										}
 									>
 										{activeOfferings.map((offering) => (
 											<MenuItem key={offering.id} value={offering.id}>
@@ -934,7 +1025,17 @@ export function VenueDetailsPage() {
 											value={selectedDate}
 											onChange={(value) => setSelectedDate(value)}
 											slotProps={{
-												textField: { size: 'small', sx: { minWidth: 180 } },
+												textField: {
+													size: 'small',
+													sx: {
+														minWidth: 180,
+                                                    },
+													error: bookingAttempted && !selectedDate,
+													helperText:
+														bookingAttempted && !selectedDate
+															? 'Select a date'
+															: ' ',
+												},
 											}}
 										/>
 									</LocalizationProvider>
@@ -943,6 +1044,10 @@ export function VenueDetailsPage() {
 								{!venue.offerings.length ? (
 									<Typography variant="body2" color="text.secondary">
 										No offerings yet.
+									</Typography>
+								) : !activeOfferings.length ? (
+									<Typography variant="body2" color="text.secondary">
+										No active offerings available.
 									</Typography>
 								) : !selectedDate ? (
 									<Typography variant="body2" color="text.secondary">
@@ -1111,36 +1216,33 @@ export function VenueDetailsPage() {
 												);
 											})()
 										)}
-										{selectedSlot && (
-											<Box sx={{ display: 'flex', justifyContent: 'center' }}>
-												<Button
-													variant="contained"
-													disabled={createBookingMutation.isPending}
-													onClick={() => {
-														if (!token) {
-															setBookingToast({
-																message: 'Please log in to book a slot',
-																severity: 'error',
-															});
-															return;
-														}
-														if (!selectedDate || !selectedSlot) return;
-
-														createBookingMutation.mutate({
-															unitId: selectedUnitId,
-															offeringId: selectedOfferingId,
-															startAt: `${dateParam}T${selectedSlot}:00`,
-														});
-													}}
-												>
-													Reserve slot
-												</Button>
-											</Box>
+										{bookingAttempted && !selectedSlot && (
+											<Typography variant="body2" color="error">
+												Select a time slot.
+											</Typography>
 										)}
 									</Stack>
 								)}
 							</Stack>
 						</DialogContent>
+						<DialogActions>
+							<Button
+								variant="contained"
+								disabled={!canSubmitBooking || createBookingMutation.isPending}
+								onClick={handleReserve}
+							>
+								Reserve
+							</Button>
+							<Button
+								variant="outlined"
+								onClick={() => {
+									resetBookingForm();
+									setBookingDialogOpen(false);
+								}}
+							>
+								Cancel
+							</Button>
+						</DialogActions>
 					</Dialog>
 				)}
 
