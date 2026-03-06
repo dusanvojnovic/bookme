@@ -9,6 +9,7 @@ import { CreateUnitDto, UpdateUnitDto } from './dto/create-unit.dto';
 import { CreateBookingDto } from './dto/create-booking.dto';
 import { CreateVenueDto } from './dto/create-venue.dto';
 import { CreateOfferingDto, UpdateOfferingDto } from './dto/offering.dto';
+import { CreateBlockDto } from './dto/create-block.dto';
 import { UpdateVenueDto } from './dto/update-venue.dto';
 import { UpdateVenueScheduleDto } from './dto/update-venue-schedule.dto';
 import { ServiceCategory } from '@prisma/client';
@@ -313,6 +314,88 @@ export class VenuesService {
         unitId: true,
         startAt: true,
         endAt: true,
+      },
+    });
+  }
+
+  async getBlocksForDate(venueId: string, date: string) {
+    const day = new Date(date);
+    if (Number.isNaN(day.getTime())) return [];
+
+    const start = new Date(day);
+    start.setHours(0, 0, 0, 0);
+    const end = new Date(day);
+    end.setHours(23, 59, 59, 999);
+
+    return this.prisma.block.findMany({
+      where: {
+        unit: { venueId },
+        startAt: { lt: end },
+        endAt: { gt: start },
+      },
+      select: {
+        id: true,
+        unitId: true,
+        startAt: true,
+        endAt: true,
+        reason: true,
+      },
+    });
+  }
+
+  async createBlock(
+    providerId: string,
+    venueId: string,
+    dto: CreateBlockDto,
+  ) {
+    const unit = await this.prisma.unit.findUnique({
+      where: { id: dto.unitId },
+      include: { venue: true },
+    });
+
+    if (!unit || unit.venueId !== venueId)
+      throw new NotFoundException('Unit not found');
+    if (unit.venue.providerId !== providerId)
+      throw new ForbiddenException('Not your venue');
+
+    const startAt = new Date(dto.startAt);
+    const endAt = new Date(dto.endAt);
+    if (Number.isNaN(startAt.getTime()) || Number.isNaN(endAt.getTime()))
+      throw new BadRequestException('Invalid block time');
+    if (endAt <= startAt)
+      throw new BadRequestException('Block end must be after start');
+    if (startAt.toDateString() !== endAt.toDateString())
+      throw new BadRequestException('Block cannot cross day boundary');
+
+    const overlappingBooking = await this.prisma.booking.findFirst({
+      where: {
+        unitId: dto.unitId,
+        status: { not: 'CANCELLED' },
+        startAt: { lt: endAt },
+        endAt: { gt: startAt },
+      },
+      select: { id: true },
+    });
+    if (overlappingBooking)
+      throw new BadRequestException('Block overlaps an existing booking');
+
+    const overlappingBlock = await this.prisma.block.findFirst({
+      where: {
+        unitId: dto.unitId,
+        startAt: { lt: endAt },
+        endAt: { gt: startAt },
+      },
+      select: { id: true },
+    });
+    if (overlappingBlock)
+      throw new BadRequestException('Block overlaps an existing block');
+
+    return this.prisma.block.create({
+      data: {
+        unitId: dto.unitId,
+        startAt,
+        endAt,
+        reason: dto.reason?.trim() || null,
       },
     });
   }

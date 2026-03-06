@@ -17,6 +17,7 @@ import { CreateUnitDto, UpdateUnitDto } from './dto/create-unit.dto';
 import { CreateVenueDto } from './dto/create-venue.dto';
 import { CreateBookingDto } from './dto/create-booking.dto';
 import { CreateOfferingDto, UpdateOfferingDto } from './dto/offering.dto';
+import { CreateBlockDto } from './dto/create-block.dto';
 import { UpdateVenueDto } from './dto/update-venue.dto';
 import { UpdateVenueScheduleDto } from './dto/update-venue-schedule.dto';
 import { VenuesService } from './venues.service';
@@ -51,6 +52,14 @@ export class VenuesController {
     @Query('date') date: string,
   ) {
     return this.venues.getBookingsForDate(id, date);
+  }
+
+  @Get('venues/:id/blocks')
+  getBlocks(
+    @Param('id') id: string,
+    @Query('date') date: string,
+  ) {
+    return this.venues.getBlocksForDate(id, date);
   }
 
   @UseGuards(AuthGuard('jwt'), RolesGuard)
@@ -112,6 +121,17 @@ export class VenuesController {
     @Body() dto: CreateUnitDto,
   ) {
     return this.venues.createUnit(req.user.id, id, dto);
+  }
+
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('PROVIDER')
+  @Post('provider/venues/:id/blocks')
+  createBlock(
+    @Req() req: Request & { user: AuthUser },
+    @Param('id') id: string,
+    @Body() dto: CreateBlockDto,
+  ) {
+    return this.venues.createBlock(req.user.id, id, dto);
   }
 
   @UseGuards(AuthGuard('jwt'), RolesGuard)
