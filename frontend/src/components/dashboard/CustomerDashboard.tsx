@@ -41,6 +41,7 @@ export function CustomerDashboard() {
 	const [city, setCity] = React.useState('all');
 	const [category, setCategory] = React.useState('all');
 	const [sortBy, setSortBy] = React.useState('none');
+	const [minRating, setMinRating] = React.useState<string>('all');
 	const navigate = useNavigate();
 
 	const {
@@ -64,9 +65,17 @@ export function CustomerDashboard() {
 		return ['all', ...Array.from(set)];
 	}, [data]);
 
-	const sortedData = React.useMemo(() => {
-		if (sortBy === 'none') return data;
-		const items = [...data];
+	const filteredAndSortedData = React.useMemo(() => {
+		const minRatingNum =
+			minRating === 'all' ? null : parseFloat(minRating);
+		let items = data;
+		if (minRatingNum != null && !Number.isNaN(minRatingNum)) {
+			items = items.filter(
+				(v) => v.avgRating != null && v.avgRating >= minRatingNum,
+			);
+		}
+		if (sortBy === 'none') return items;
+		items = [...items];
 		if (sortBy === 'price-asc') {
 			items.sort((a, b) => {
 				const priceA = a.priceFrom ?? Number.POSITIVE_INFINITY;
@@ -81,8 +90,22 @@ export function CustomerDashboard() {
 				return priceB - priceA;
 			});
 		}
+		if (sortBy === 'rating-desc') {
+			items.sort((a, b) => {
+				const rA = a.avgRating ?? Number.NEGATIVE_INFINITY;
+				const rB = b.avgRating ?? Number.NEGATIVE_INFINITY;
+				return rB - rA;
+			});
+		}
+		if (sortBy === 'rating-asc') {
+			items.sort((a, b) => {
+				const rA = a.avgRating ?? Number.POSITIVE_INFINITY;
+				const rB = b.avgRating ?? Number.POSITIVE_INFINITY;
+				return rA - rB;
+			});
+		}
 		return items;
-	}, [data, sortBy]);
+	}, [data, sortBy, minRating]);
 
 	return (
 		<Box
@@ -121,6 +144,7 @@ export function CustomerDashboard() {
 							setCity('all');
 							setCategory('all');
 							setSortBy('none');
+							setMinRating('all');
 						}}
 					>
 						Reset
@@ -190,6 +214,25 @@ export function CustomerDashboard() {
 							variant="body2"
 							sx={{ mb: 0.75, color: 'text.secondary' }}
 						>
+							Min. rating
+						</Typography>
+						<Select
+							fullWidth
+							value={minRating}
+							onChange={(e) => setMinRating(String(e.target.value))}
+						>
+							<MenuItem value="all">Any</MenuItem>
+							<MenuItem value="4">4+ stars</MenuItem>
+							<MenuItem value="3.5">3.5+ stars</MenuItem>
+							<MenuItem value="3">3+ stars</MenuItem>
+						</Select>
+					</Box>
+
+					<Box>
+						<Typography
+							variant="body2"
+							sx={{ mb: 0.75, color: 'text.secondary' }}
+						>
 							Sort by
 						</Typography>
 						<Select
@@ -200,6 +243,8 @@ export function CustomerDashboard() {
 							<MenuItem value="none">Default</MenuItem>
 							<MenuItem value="price-asc">Price: low to high</MenuItem>
 							<MenuItem value="price-desc">Price: high to low</MenuItem>
+							<MenuItem value="rating-desc">Rating: high to low</MenuItem>
+							<MenuItem value="rating-asc">Rating: low to high</MenuItem>
 						</Select>
 					</Box>
 
@@ -279,7 +324,7 @@ export function CustomerDashboard() {
 					sx={{ mb: 1.5 }}
 				>
 					<Typography variant="body2" color="text.secondary">
-						Showing: <b>{isLoading ? '...' : data.length}</b>
+						Showing: <b>{isLoading ? '...' : filteredAndSortedData.length}</b>
 					</Typography>
 					{isError && (
 						<Typography variant="body2" color="error">
@@ -294,9 +339,9 @@ export function CustomerDashboard() {
 						gridTemplateColumns: {
 							xs: '1fr',
 							sm: '1fr 1fr',
-							xl: '1fr 1fr 1fr',
+							xl: '1fr 1fr',
 						},
-						gap: 2,
+						gap: 2.5,
 					}}
 				>
 					{isLoading
@@ -304,20 +349,20 @@ export function CustomerDashboard() {
 								<Paper
 									key={i}
 									variant="outlined"
-									sx={{ borderRadius: 2, overflow: 'hidden' }}
+									sx={{ borderRadius: 2.5, overflow: 'hidden' }}
 								>
 									<Skeleton
 										variant="rectangular"
-										height={140}
+										height={180}
 									/>
-									<Box sx={{ p: 2 }}>
+									<Box sx={{ p: 2.5 }}>
 										<Skeleton width="70%" />
 										<Skeleton width="45%" />
 										<Skeleton width="90%" />
 									</Box>
 								</Paper>
 							))
-						: sortedData.map((v) => (
+						: filteredAndSortedData.map((v) => (
 								<VenueCardItem
 									key={v.id}
 									v={v}

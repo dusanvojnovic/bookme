@@ -1,11 +1,12 @@
 import LocationOnIcon from '@mui/icons-material/LocationOn';
+import StarIcon from '@mui/icons-material/Star';
 import {
-	Box,
-	Button,
-	Chip,
-	Paper,
-	Stack,
-	Typography,
+    Box,
+    Button,
+    Chip,
+    Paper,
+    Stack,
+    Typography,
 } from '@mui/material';
 
 import { type VenueCard } from '../../types/venue';
@@ -21,7 +22,7 @@ export function VenueCardItem({
 		<Paper
 			variant="outlined"
 			sx={{
-				borderRadius: 2,
+				borderRadius: 2.5,
 				overflow: 'hidden',
 				transition: 'transform .12s ease',
 				'&:hover': { transform: 'translateY(-2px)' },
@@ -30,44 +31,52 @@ export function VenueCardItem({
 			{/* “Hero” header (no images yet) */}
 			<Box
 				sx={{
-					height: 140,
+					height: 160,
 					bgcolor: 'action.hover',
-					px: 2,
-					pt: 1.25,
-					pb: 2,
+					px: 2.5,
+					pt: 1.5,
+					pb: 2.5,
 					display: 'flex',
 					flexDirection: 'column',
 				}}
 			>
 				<Chip
 					label={v.category}
-					size="small"
+					size="medium"
 					variant="outlined"
 					sx={{ alignSelf: 'flex-start' }}
 				/>
 				<Box sx={{ mt: 'auto' }}>
-					<Typography fontWeight={900} variant="h6" noWrap>
+					<Typography fontWeight={900} variant="h5" noWrap>
 						{v.name}
 					</Typography>
-					<Stack direction="row" spacing={0.75} alignItems="center">
-						<LocationOnIcon fontSize="small" />
-						<Typography variant="body2" color="text.secondary" noWrap>
+					<Stack direction="row" spacing={1} alignItems="center" sx={{ mt: 0.5 }}>
+						<LocationOnIcon fontSize="medium" />
+						<Typography variant="body1" color="text.secondary" noWrap>
 							{v.address ? `${v.city} • ${v.address}` : v.city}
 						</Typography>
 					</Stack>
 				</Box>
 			</Box>
 
-			<Box sx={{ p: 2 }}>
-				<Stack direction="row" gap={1} flexWrap="wrap">
+			<Box sx={{ p: 2.5 }}>
+				<Stack direction="row" gap={1.25} flexWrap="wrap" alignItems="center">
+					{v.avgRating != null && (
+						<Chip
+							icon={<StarIcon sx={{ fontSize: 18 }} />}
+							label={`${v.avgRating} (${v.reviewsCount})`}
+							size="medium"
+							variant="outlined"
+						/>
+					)}
 					<Chip
 						label={`${v.unitsCount ?? 0} units`}
-						size="small"
+						size="medium"
 						variant="outlined"
 					/>
 					<Chip
 						label={`${v.offeringsCount ?? 0} offerings`}
-						size="small"
+						size="medium"
 						variant="outlined"
 					/>
 				</Stack>
@@ -76,15 +85,15 @@ export function VenueCardItem({
 					direction="row"
 					justifyContent="space-between"
 					alignItems="center"
-					sx={{ mt: 1.5 }}
+					sx={{ mt: 2 }}
 				>
-					<Typography fontWeight={900}>
+					<Typography fontWeight={900} variant="h6">
 						{v.priceFrom == null
 							? 'Price on request'
 							: `From ${formatRsd(v.priceFrom)}`}
 					</Typography>
 
-					<Button variant="contained" onClick={onOpen}>
+					<Button variant="contained" size="large" onClick={onOpen}>
 						Details
 					</Button>
 				</Stack>

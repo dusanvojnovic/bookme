@@ -7,6 +7,8 @@ export interface VenueCard {
 	unitsCount: number;
 	offeringsCount: number;
 	priceFrom: number | null;
+	avgRating: number | null;
+	reviewsCount: number;
 }
 
 export interface Unit {
