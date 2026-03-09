@@ -1062,7 +1062,7 @@ export function VenueDetailsPage() {
 												minWidth: 200,
 												height: 40,
 												display: 'flex',
-												alignItems: 'center',
+												alignItems: 'start',
 											}}
 										>
 											<Typography fontWeight={700}>

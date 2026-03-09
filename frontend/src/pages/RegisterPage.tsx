@@ -1,6 +1,19 @@
 import React from 'react';
+import { Box } from '@mui/material';
 import { AuthForm } from '../components/forms/AuthForm';
 
 export const RegisterPage: React.FunctionComponent = () => {
-	return <AuthForm mode="register" />;
+	return (
+		<Box
+			sx={{
+				minHeight: { xs: 'calc(100vh - 120px)', md: 'calc(100vh - 160px)' },
+				display: 'flex',
+				justifyContent: 'center',
+				alignItems: 'center',
+				width: '100%',
+			}}
+		>
+			<AuthForm mode="register" />
+		</Box>
+	);
 };
