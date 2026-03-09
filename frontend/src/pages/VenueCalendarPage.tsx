@@ -1,10 +1,13 @@
 import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
+import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
+import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import {
 	Alert,
 	Box,
 	Button,
 	Chip,
 	Divider,
+	IconButton,
 	MenuItem,
 	Paper,
 	Select,
@@ -217,14 +220,48 @@ export function VenueCalendarPage() {
 							spacing={1}
 							alignItems={{ sm: 'center' }}
 						>
-							<LocalizationProvider dateAdapter={AdapterDayjs}>
-								<DatePicker
-									label="Date"
-									value={selectedDate}
-									onChange={(value) => setSelectedDate(value)}
-									slotProps={{ textField: { size: 'small' } }}
-								/>
-							</LocalizationProvider>
+							<Stack direction="row" alignItems="center" spacing={0.5}>
+								<IconButton
+									size="small"
+									onClick={() => {
+										const base = selectedDate ?? dayjs();
+										if (viewMode === 'day') {
+											setSelectedDate(base.subtract(1, 'day'));
+										} else {
+											setSelectedDate(weekStart.subtract(7, 'day'));
+										}
+									}}
+									aria-label={
+										viewMode === 'day' ? 'Previous day' : 'Previous week'
+									}
+								>
+									<ChevronLeftIcon />
+								</IconButton>
+								<LocalizationProvider dateAdapter={AdapterDayjs}>
+									<DatePicker
+										label="Date"
+										value={selectedDate}
+										onChange={(value) => setSelectedDate(value)}
+										slotProps={{ textField: { size: 'small' } }}
+									/>
+								</LocalizationProvider>
+								<IconButton
+									size="small"
+									onClick={() => {
+										const base = selectedDate ?? dayjs();
+										if (viewMode === 'day') {
+											setSelectedDate(base.add(1, 'day'));
+										} else {
+											setSelectedDate(weekStart.add(7, 'day'));
+										}
+									}}
+									aria-label={
+										viewMode === 'day' ? 'Next day' : 'Next week'
+									}
+								>
+									<ChevronRightIcon />
+								</IconButton>
+							</Stack>
 							{viewMode === 'week' && (
 								<Select
 									value={selectedUnitId}
