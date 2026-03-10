@@ -106,6 +106,23 @@ export const lightTheme = createTheme({
 			styleOverrides: {
 				root: {
 					borderRadius: 10,
+					'&:focus, &:focus-visible': {
+						outline: 'none',
+						boxShadow: 'none',
+					},
+				},
+			},
+		},
+		MuiIconButton: {
+			defaultProps: {
+				disableFocusRipple: true,
+			},
+			styleOverrides: {
+				root: {
+					'&:focus, &:focus-visible': {
+						outline: 'none',
+						boxShadow: 'none',
+					},
 				},
 			},
 		},
@@ -199,6 +216,23 @@ export const darkTheme = createTheme({
 			styleOverrides: {
 				root: {
 					borderRadius: 10,
+					'&:focus, &:focus-visible': {
+						outline: 'none',
+						boxShadow: 'none',
+					},
+				},
+			},
+		},
+		MuiIconButton: {
+			defaultProps: {
+				disableFocusRipple: true,
+			},
+			styleOverrides: {
+				root: {
+					'&:focus, &:focus-visible': {
+						outline: 'none',
+						boxShadow: 'none',
+					},
 				},
 			},
 		},
