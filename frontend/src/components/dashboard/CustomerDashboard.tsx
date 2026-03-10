@@ -14,10 +14,11 @@ import {
 	TextField,
 	Typography,
 } from '@mui/material';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
 import * as React from 'react';
 import { api } from '../../api/api';
+import { useAuthStore } from '../../store/auth.store';
 import { VenueCardItem } from '../venues/VenueCardItem';
 import { type VenueCard } from '../../types/venue';
 
@@ -36,13 +37,36 @@ async function fetchVenues(params: {
 	return res.data;
 }
 
+async function fetchFavorites(token: string) {
+	const res = await api.get<string[]>('/customer/favorites', {
+		headers: { Authorization: `Bearer ${token}` },
+	});
+	return res.data;
+}
+
+async function addFavorite(token: string, venueId: string) {
+	await api.post(`/customer/favorites/${venueId}`, {}, {
+		headers: { Authorization: `Bearer ${token}` },
+	});
+}
+
+async function removeFavorite(token: string, venueId: string) {
+	await api.delete(`/customer/favorites/${venueId}`, {
+		headers: { Authorization: `Bearer ${token}` },
+	});
+}
+
 export function CustomerDashboard() {
+	const token = useAuthStore((s) => s.token);
+	const user = useAuthStore((s) => s.user);
 	const [q, setQ] = React.useState('');
 	const [city, setCity] = React.useState('all');
 	const [category, setCategory] = React.useState('all');
 	const [sortBy, setSortBy] = React.useState('none');
 	const [minRating, setMinRating] = React.useState<string>('all');
+	const [favoritesOnly, setFavoritesOnly] = React.useState(false);
 	const navigate = useNavigate();
+	const queryClient = useQueryClient();
 
 	const {
 		data = [],
@@ -52,6 +76,27 @@ export function CustomerDashboard() {
 		queryKey: ['venues', q, city, category],
 		queryFn: () => fetchVenues({ q, city, category }),
 		staleTime: 30_000,
+	});
+
+	const { data: favoriteIds = [] } = useQuery({
+		queryKey: ['favorites', token],
+		queryFn: () => fetchFavorites(token!),
+		enabled: !!token && user?.role === 'CUSTOMER',
+		staleTime: 30_000,
+	});
+
+	const addFavoriteMutation = useMutation({
+		mutationFn: (venueId: string) => addFavorite(token!, venueId),
+		onSuccess: () => {
+			queryClient.invalidateQueries({ queryKey: ['favorites', token] });
+		},
+	});
+
+	const removeFavoriteMutation = useMutation({
+		mutationFn: (venueId: string) => removeFavorite(token!, venueId),
+		onSuccess: () => {
+			queryClient.invalidateQueries({ queryKey: ['favorites', token] });
+		},
 	});
 
 	// Cities from data (after load)
@@ -69,6 +114,9 @@ export function CustomerDashboard() {
 		const minRatingNum =
 			minRating === 'all' ? null : parseFloat(minRating);
 		let items = data;
+		if (favoritesOnly && favoriteIds.length > 0) {
+			items = items.filter((v) => favoriteIds.includes(v.id));
+		}
 		if (minRatingNum != null && !Number.isNaN(minRatingNum)) {
 			items = items.filter(
 				(v) => v.avgRating != null && v.avgRating >= minRatingNum,
@@ -105,7 +153,7 @@ export function CustomerDashboard() {
 			});
 		}
 		return items;
-	}, [data, sortBy, minRating]);
+	}, [data, sortBy, minRating, favoritesOnly, favoriteIds]);
 
 	return (
 		<Box
@@ -145,6 +193,7 @@ export function CustomerDashboard() {
 							setCategory('all');
 							setSortBy('none');
 							setMinRating('all');
+							setFavoritesOnly(false);
 						}}
 					>
 						Reset
@@ -208,6 +257,27 @@ export function CustomerDashboard() {
 							))}
 						</Select>
 					</Box>
+
+					{user?.role === 'CUSTOMER' && (
+						<Box>
+							<Typography
+								variant="body2"
+								sx={{ mb: 0.75, color: 'text.secondary' }}
+							>
+								Show
+							</Typography>
+							<Select
+								fullWidth
+								value={favoritesOnly ? 'favorites' : 'all'}
+								onChange={(e) =>
+									setFavoritesOnly(e.target.value === 'favorites')
+								}
+							>
+								<MenuItem value="all">All venues</MenuItem>
+								<MenuItem value="favorites">Favorites only</MenuItem>
+							</Select>
+						</Box>
+					)}
 
 					<Box>
 						<Typography
@@ -371,6 +441,23 @@ export function CustomerDashboard() {
 											to: '/venues/$venueId',
 											params: { venueId: v.id },
 										})
+									}
+									isFavorite={
+										user?.role === 'CUSTOMER'
+											? favoriteIds.includes(v.id)
+											: undefined
+									}
+									onToggleFavorite={
+										user?.role === 'CUSTOMER'
+											? (e) => {
+													e.stopPropagation();
+													if (favoriteIds.includes(v.id)) {
+														removeFavoriteMutation.mutate(v.id);
+													} else {
+														addFavoriteMutation.mutate(v.id);
+													}
+												}
+											: undefined
 									}
 								/>
 							))}

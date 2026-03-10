@@ -1,11 +1,15 @@
+import FavoriteIcon from '@mui/icons-material/Favorite';
+import FavoriteBorderIcon from '@mui/icons-material/FavoriteBorder';
 import LocationOnIcon from '@mui/icons-material/LocationOn';
 import StarIcon from '@mui/icons-material/Star';
 import {
     Box,
     Button,
     Chip,
+    IconButton,
     Paper,
     Stack,
+    Tooltip,
     Typography,
 } from '@mui/material';
 
@@ -14,9 +18,13 @@ import { type VenueCard } from '../../types/venue';
 export function VenueCardItem({
 	v,
 	onOpen,
+	isFavorite,
+	onToggleFavorite,
 }: {
 	v: VenueCard;
 	onOpen: () => void;
+	isFavorite?: boolean;
+	onToggleFavorite?: (e: React.MouseEvent) => void;
 }) {
 	return (
 		<Paper
@@ -40,12 +48,31 @@ export function VenueCardItem({
 					flexDirection: 'column',
 				}}
 			>
-				<Chip
-					label={v.category}
-					size="medium"
-					variant="outlined"
-					sx={{ alignSelf: 'flex-start' }}
-				/>
+				<Stack direction="row" justifyContent="space-between" alignItems="flex-start">
+					<Chip
+						label={v.category}
+						size="medium"
+						variant="outlined"
+					/>
+					{onToggleFavorite && (
+						<Tooltip
+							title={isFavorite ? 'Remove from favorites' : 'Add to favorites'}
+						>
+							<IconButton
+								size="small"
+								onClick={onToggleFavorite}
+								sx={{ color: isFavorite ? 'error.main' : 'action.active' }}
+								aria-label={isFavorite ? 'Remove from favorites' : 'Add to favorites'}
+							>
+								{isFavorite ? (
+									<FavoriteIcon fontSize="small" />
+								) : (
+									<FavoriteBorderIcon fontSize="small" />
+								)}
+							</IconButton>
+						</Tooltip>
+					)}
+				</Stack>
 				<Box sx={{ mt: 'auto' }}>
 					<Typography fontWeight={900} variant="h5" noWrap>
 						{v.name}
