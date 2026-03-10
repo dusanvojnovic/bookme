@@ -43,10 +43,11 @@ model User {
 
     providerProfile ProviderProfile?
 
-    venues    Venue[]    @relation("ProviderVenues")
-    bookings  Booking[]  @relation("CustomerBookings")
-    reviews   Review[]   @relation("AuthorReviews")
-    favorites Favorite[]
+    venues         Venue[]         @relation("ProviderVenues")
+    bookings       Booking[]       @relation("CustomerBookings")
+    reviews        Review[]        @relation("AuthorReviews")
+    favorites      Favorite[]
+    notifications  Notification[]
 }
 
 model ProviderProfile {
@@ -205,4 +206,26 @@ model Favorite {
 
     @@unique([userId, venueId])
     @@index([userId])
+}
+
+enum NotificationType {
+    NEW_BOOKING
+    BOOKING_CANCELLED
+}
+
+model Notification {
+    id        String           @id @default(uuid())
+    userId    String
+    user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+    type      NotificationType
+    title     String
+    body      String?
+    readAt    DateTime?
+    bookingId String?
+    venueId   String?
+
+    createdAt DateTime @default(now())
+
+    @@index([userId])
+    @@index([userId, readAt])
 }

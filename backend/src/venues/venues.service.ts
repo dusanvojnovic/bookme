@@ -4,6 +4,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { NotificationsService } from '../notifications/notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateUnitDto, UpdateUnitDto } from './dto/create-unit.dto';
 import { CreateBookingDto } from './dto/create-booking.dto';
@@ -17,7 +18,10 @@ import { ServiceCategory } from '@prisma/client';
 
 @Injectable()
 export class VenuesService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private notifications: NotificationsService,
+  ) {}
 
   create(providerId: string, dto: CreateVenueDto) {
     return this.prisma.venue.create({
@@ -515,7 +519,7 @@ export class VenuesService {
     if (overlappingBlock)
       throw new BadRequestException('Slot is not available');
 
-    return this.prisma.booking.create({
+    const booking = await this.prisma.booking.create({
       data: {
         unitId: dto.unitId,
         offeringId: dto.offeringId,
@@ -526,7 +530,27 @@ export class VenuesService {
         partySize: dto.partySize ?? null,
         notes: dto.notes ?? null,
       },
+      include: {
+        unit: { include: { venue: { include: { provider: true } } } },
+        offering: true,
+        customer: true,
+      },
     });
+
+    const { unit: bookingUnit, customer } = booking;
+    const venue = bookingUnit.venue;
+    const provider = venue.provider;
+
+    this.notifications.createNewBooking(
+      provider.id,
+      venue.id,
+      venue.name,
+      bookingUnit.name,
+      booking.id,
+      startAt,
+    ).catch(() => {});
+
+    return booking;
   }
 
   listCustomerBookings(customerId: string) {
@@ -605,6 +629,10 @@ export class VenuesService {
   async cancelBooking(customerId: string, bookingId: string) {
     const booking = await this.prisma.booking.findUnique({
       where: { id: bookingId },
+      include: {
+        unit: { include: { venue: { include: { provider: true } } } },
+        customer: true,
+      },
     });
     if (!booking || booking.customerId !== customerId)
       throw new NotFoundException('Booking not found');
@@ -613,9 +641,30 @@ export class VenuesService {
     if (booking.startAt <= new Date())
       throw new BadRequestException('Cannot cancel a past booking');
 
-    return this.prisma.booking.update({
+    await this.prisma.booking.update({
       where: { id: bookingId },
       data: { status: 'CANCELLED' },
+    });
+
+    const venue = booking.unit.venue;
+    const provider = venue.provider;
+
+    this.notifications.createBookingCancelled(
+      customerId,
+      venue.id,
+      venue.name,
+      booking.startAt,
+    ).catch(() => {});
+
+    this.notifications.createBookingCancelled(
+      provider.id,
+      venue.id,
+      venue.name,
+      booking.startAt,
+    ).catch(() => {});
+
+    return this.prisma.booking.findUnique({
+      where: { id: bookingId },
     });
   }
 }

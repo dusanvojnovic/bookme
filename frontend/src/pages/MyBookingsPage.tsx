@@ -102,6 +102,7 @@ export function MyBookingsPage() {
 			setCancelConfirmBooking(null);
 			setCancelError(null);
 			queryClient.invalidateQueries({ queryKey: ['my-bookings', token] });
+			queryClient.invalidateQueries({ queryKey: ['notifications-unread'] });
 		},
 		onError: (e: unknown) => {
 			const msg =

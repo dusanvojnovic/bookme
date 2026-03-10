@@ -4,6 +4,7 @@ import { AppBar, Button, IconButton, Toolbar, Typography } from '@mui/material';
 import { Link, useNavigate } from '@tanstack/react-router';
 import { useAuthStore } from '../../store/auth.store';
 import { useThemeMode } from '../../theme/mode';
+import { NotificationBell } from './NotificationBell';
 
 export const Navbar = () => {
 	const { mode, toggleMode } = useThemeMode();
@@ -31,6 +32,16 @@ export const Navbar = () => {
                 </Link>
 
 				<Toolbar sx={{ gap: 1, minHeight: 'unset', p: 0 }}>
+					{token && <NotificationBell />}
+
+					<IconButton
+						onClick={toggleMode}
+						color="inherit"
+						aria-label="toggle theme"
+					>
+						{mode === 'dark' ? <LightModeIcon /> : <DarkModeIcon />}
+					</IconButton>
+
 					{token && (
 						<Button
 							color="inherit"
@@ -42,14 +53,6 @@ export const Navbar = () => {
 							Logout
 						</Button>
 					)}
-
-					<IconButton
-						onClick={toggleMode}
-						color="inherit"
-						aria-label="toggle theme"
-					>
-						{mode === 'dark' ? <LightModeIcon /> : <DarkModeIcon />}
-					</IconButton>
 				</Toolbar>
 			</Toolbar>
 		</AppBar>
