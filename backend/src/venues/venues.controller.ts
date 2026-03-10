@@ -21,6 +21,7 @@ import { CreateBlockDto } from './dto/create-block.dto';
 import { CreateReviewDto } from './dto/create-review.dto';
 import { UpdateVenueDto } from './dto/update-venue.dto';
 import { UpdateVenueScheduleDto } from './dto/update-venue-schedule.dto';
+import { FavoritesService } from './favorites.service';
 import { VenuesService } from './venues.service';
 
 export interface AuthUser {
@@ -30,7 +31,10 @@ export interface AuthUser {
 
 @Controller()
 export class VenuesController {
-  constructor(private venues: VenuesService) {}
+  constructor(
+    private venues: VenuesService,
+    private favorites: FavoritesService,
+  ) {}
 
   // PUBLIC
   @Get('venues')
@@ -79,6 +83,43 @@ export class VenuesController {
   @Get('customer/bookings')
   listCustomerBookings(@Req() req: Request & { user: AuthUser }) {
     return this.venues.listCustomerBookings(req.user.id);
+  }
+
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('CUSTOMER')
+  @Get('customer/favorites')
+  listFavorites(@Req() req: Request & { user: AuthUser }) {
+    return this.favorites.list(req.user.id);
+  }
+
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('CUSTOMER')
+  @Post('customer/favorites/:venueId')
+  addFavorite(
+    @Req() req: Request & { user: AuthUser },
+    @Param('venueId') venueId: string,
+  ) {
+    return this.favorites.add(req.user.id, venueId);
+  }
+
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('CUSTOMER')
+  @Delete('customer/favorites/:venueId')
+  removeFavorite(
+    @Req() req: Request & { user: AuthUser },
+    @Param('venueId') venueId: string,
+  ) {
+    return this.favorites.remove(req.user.id, venueId);
+  }
+
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('CUSTOMER')
+  @Patch('customer/bookings/:id/cancel')
+  cancelBooking(
+    @Req() req: Request & { user: AuthUser },
+    @Param('id') id: string,
+  ) {
+    return this.venues.cancelBooking(req.user.id, id);
   }
 
   @UseGuards(AuthGuard('jwt'), RolesGuard)
