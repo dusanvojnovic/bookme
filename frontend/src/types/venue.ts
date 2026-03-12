@@ -23,6 +23,7 @@ export interface Unit {
 
 export interface Offering {
 	id: string;
+	unitId: string;
 	name: string;
 	durationMin: number;
 	price?: number | null;
@@ -53,6 +54,7 @@ export interface VenueDetails {
 	city: string;
 	address?: string | null;
 	slotStepMin?: number | null;
+	autoApprove?: boolean;
 	units: Unit[];
 	offerings: Offering[];
 	schedules: VenueSchedule[];

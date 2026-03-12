@@ -5,10 +5,12 @@ import {
 	Box,
 	Button,
 	Divider,
+	FormControlLabel,
 	MenuItem,
 	Paper,
 	Select,
 	Stack,
+	Switch,
 	TextField,
 	Typography,
 } from '@mui/material';
@@ -33,6 +35,7 @@ type CreateVenuePayload = {
 	city: string;
 	description?: string;
 	address?: string;
+	autoApprove?: boolean;
 };
 
 const CATEGORY_OPTIONS = [
@@ -57,12 +60,43 @@ async function createVenue(token: string, payload: CreateVenuePayload) {
 	return res.data;
 }
 
+type ProviderBooking = {
+	id: string;
+	status: string;
+	startAt: string;
+	endAt: string;
+	unit: { id: string; name: string; venue: { id: string; name: string; city: string; address?: string | null } };
+	offering: { id: string; name: string; durationMin: number; price?: number | null };
+	customer: { id: string; email: string };
+};
+
+async function fetchPendingBookings(token: string) {
+	const res = await api.get<ProviderBooking[]>('/provider/bookings', {
+		params: { status: 'PENDING' },
+		headers: { Authorization: `Bearer ${token}` },
+	});
+	return res.data;
+}
+
+async function approveBooking(token: string, bookingId: string) {
+	await api.patch(`/provider/bookings/${bookingId}/approve`, null, {
+		headers: { Authorization: `Bearer ${token}` },
+	});
+}
+
+async function rejectBooking(token: string, bookingId: string) {
+	await api.patch(`/provider/bookings/${bookingId}/reject`, null, {
+		headers: { Authorization: `Bearer ${token}` },
+	});
+}
+
 const EMPTY_FORM: CreateVenuePayload = {
 	category: 'SPORT',
 	name: '',
 	city: '',
 	description: '',
 	address: '',
+	autoApprove: true,
 };
 
 export function ProviderDashboard() {
@@ -90,6 +124,27 @@ export function ProviderDashboard() {
 			queryClient.invalidateQueries({
 				queryKey: ['provider-venues', token],
 			});
+		},
+	});
+
+	const { data: pendingBookings = [] } = useQuery({
+		queryKey: ['provider-pending-bookings', token],
+		enabled: !!token,
+		queryFn: () => fetchPendingBookings(token!),
+	});
+
+	const approveMutation = useMutation({
+		mutationFn: (bookingId: string) => approveBooking(token!, bookingId),
+		onSuccess: () => {
+			queryClient.invalidateQueries({ queryKey: ['provider-pending-bookings', token] });
+			queryClient.invalidateQueries({ queryKey: ['notifications-unread'] });
+		},
+	});
+	const rejectMutation = useMutation({
+		mutationFn: (bookingId: string) => rejectBooking(token!, bookingId),
+		onSuccess: () => {
+			queryClient.invalidateQueries({ queryKey: ['provider-pending-bookings', token] });
+			queryClient.invalidateQueries({ queryKey: ['notifications-unread'] });
 		},
 	});
 
@@ -145,12 +200,58 @@ export function ProviderDashboard() {
 						</Typography>
 					</Box>
 
-					<Stack direction="row" spacing={1}>
-						<Button variant="outlined">Blocks (soon)</Button>
-						<Button variant="contained">Bookings (soon)</Button>
-					</Stack>
 				</Stack>
 			</Paper>
+
+			{pendingBookings.length > 0 && (
+				<Paper variant="outlined" sx={{ p: 2, borderRadius: 2, mb: 2 }}>
+					<Typography fontWeight={800} sx={{ mb: 2 }}>
+						Pending approvals ({pendingBookings.length})
+					</Typography>
+					<Stack spacing={2}>
+						{pendingBookings.map((b) => (
+							<Paper key={b.id} variant="outlined" sx={{ p: 2 }}>
+								<Stack spacing={0.5}>
+									<Typography fontWeight={700}>
+										{b.unit.venue.name} – {b.unit.name}
+									</Typography>
+									<Typography variant="body2" color="text.secondary">
+										{b.offering.name} •{' '}
+										{new Date(b.startAt).toLocaleString('en-US', {
+											dateStyle: 'medium',
+											timeStyle: 'short',
+										})}
+									</Typography>
+									<Typography variant="body2" color="text.secondary">
+										Customer: {b.customer.email}
+									</Typography>
+									<Divider sx={{ my: 2 }} />
+									<Stack direction="row" spacing={1}>
+										<Button
+											size="small"
+											variant="contained"
+											color="success"
+											disabled={approveMutation.isPending || rejectMutation.isPending}
+											onClick={() => approveMutation.mutate(b.id)}
+										>
+											Approve
+										</Button>
+										<Button
+											size="small"
+											variant="outlined"
+											color="error"
+											disabled={approveMutation.isPending || rejectMutation.isPending}
+											onClick={() => rejectMutation.mutate(b.id)}
+										>
+											Reject
+										</Button>
+									</Stack>
+								</Stack>
+							</Paper>
+						))}
+					</Stack>
+				</Paper>
+			)}
 
 			<Stack
 				direction={{ xs: 'column', md: 'row' }}
@@ -258,6 +359,21 @@ export function ProviderDashboard() {
 							/>
 						</Stack>
 
+						<FormControlLabel
+							control={
+								<Switch
+									checked={form.autoApprove ?? true}
+									onChange={(e) =>
+										setForm((prev) => ({
+											...prev,
+											autoApprove: e.target.checked,
+										}))
+									}
+								/>
+							}
+							label="Auto-approve reservations"
+						/>
+
 						<Stack direction="row" spacing={1} alignItems="center">
 							<Button
 								variant="contained"
@@ -271,6 +387,7 @@ export function ProviderDashboard() {
 										address: form.address?.trim() || undefined,
 										description:
 											form.description?.trim() || undefined,
+										autoApprove: form.autoApprove ?? true,
 									})
 								}
 							>
@@ -345,6 +462,7 @@ export function ProviderDashboard() {
 											direction="row"
 											spacing={0.5}
 											alignItems="center"
+											flexWrap="wrap"
 										>
 											<LocationOnIcon fontSize="small" />
 											<Typography
@@ -356,6 +474,24 @@ export function ProviderDashboard() {
 													? ` • ${venue.address}`
 													: ''}
 											</Typography>
+											<Button
+												size="small"
+												variant="text"
+												onClick={() => {
+													const q = encodeURIComponent(
+														venue.address
+															? `${venue.address}, ${venue.city}`
+															: venue.city,
+													);
+													window.open(
+														`https://www.google.com/maps/search/?api=1&query=${q}`,
+														'_blank',
+													);
+												}}
+												sx={{ textTransform: 'none', minWidth: 'auto', py: 0 }}
+											>
+												Show on map
+											</Button>
 										</Stack>
 
 										{venue.description && (

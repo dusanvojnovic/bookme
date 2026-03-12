@@ -410,7 +410,7 @@ function formatStatus(status: string) {
 		case 'CONFIRMED':
 			return 'Confirmed';
 		case 'PENDING':
-			return 'Pending';
+			return 'Pending approval';
 		case 'CANCELLED':
 			return 'Cancelled';
 		case 'COMPLETED':

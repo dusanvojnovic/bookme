@@ -77,11 +77,28 @@ export function VenueCardItem({
 					<Typography fontWeight={900} variant="h5" noWrap>
 						{v.name}
 					</Typography>
-					<Stack direction="row" spacing={1} alignItems="center" sx={{ mt: 0.5 }}>
+					<Stack direction="row" spacing={1} alignItems="center" sx={{ mt: 0.5 }} flexWrap="wrap">
 						<LocationOnIcon fontSize="medium" />
 						<Typography variant="body1" color="text.secondary" noWrap>
 							{v.address ? `${v.city} • ${v.address}` : v.city}
 						</Typography>
+						<Button
+							size="small"
+							variant="text"
+							onClick={(e) => {
+								e.stopPropagation();
+								const q = encodeURIComponent(
+									v.address ? `${v.address}, ${v.city}` : v.city,
+								);
+								window.open(
+									`https://www.google.com/maps/search/?api=1&query=${q}`,
+									'_blank',
+								);
+							}}
+							sx={{ textTransform: 'none', minWidth: 'auto', py: 0 }}
+						>
+							Show on map
+						</Button>
 					</Stack>
 				</Box>
 			</Box>
