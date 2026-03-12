@@ -33,6 +33,7 @@ export class VenuesService {
         description: dto.description ?? null,
         address: dto.address ?? null,
         slotStepMin: dto.slotStepMin ?? null,
+        autoApprove: dto.autoApprove ?? true,
       },
     });
   }
@@ -50,12 +51,13 @@ export class VenuesService {
     return this.prisma.venue.update({
       where: { id: venueId },
       data: {
-        category: dto.category,
-        name: dto.name,
-        city: dto.city,
-        description: dto.description,
-        address: dto.address,
-        slotStepMin: dto.slotStepMin,
+        ...(dto.category != null && { category: dto.category }),
+        ...(dto.name != null && { name: dto.name }),
+        ...(dto.city != null && { city: dto.city }),
+        ...(dto.description !== undefined && { description: dto.description }),
+        ...(dto.address !== undefined && { address: dto.address }),
+        ...(dto.slotStepMin !== undefined && { slotStepMin: dto.slotStepMin }),
+        ...(dto.autoApprove !== undefined && { autoApprove: dto.autoApprove }),
       },
     });
   }
@@ -277,9 +279,23 @@ export class VenuesService {
     if (venue.providerId !== providerId)
       throw new ForbiddenException('Not your venue');
 
+    const unit = await this.prisma.unit.findFirst({
+      where: { id: dto.unitId, venueId },
+    });
+    if (!unit)
+      throw new BadRequestException('Unit not found or not in this venue');
+    if (
+      (unit.minDurationMin != null && dto.durationMin < unit.minDurationMin) ||
+      (unit.maxDurationMin != null && dto.durationMin > unit.maxDurationMin)
+    )
+      throw new BadRequestException(
+        `Duration must be between ${unit.minDurationMin ?? 0} and ${unit.maxDurationMin ?? '∞'} min for this unit`,
+      );
+
     return this.prisma.offering.create({
       data: {
         venueId,
+        unitId: dto.unitId,
         name: dto.name,
         durationMin: dto.durationMin,
         price: dto.price ?? null,
@@ -297,7 +313,7 @@ export class VenuesService {
   ) {
     const offering = await this.prisma.offering.findUnique({
       where: { id: offeringId },
-      include: { venue: true },
+      include: { venue: true, unit: true },
     });
 
     if (!offering || offering.venueId !== venueId)
@@ -305,15 +321,32 @@ export class VenuesService {
     if (offering.venue.providerId !== providerId)
       throw new ForbiddenException('Not your venue');
 
+    const targetUnitId = dto.unitId ?? offering.unitId;
+    const durationMin = dto.durationMin ?? offering.durationMin;
+    const targetUnit = await this.prisma.unit.findFirst({
+      where: { id: targetUnitId, venueId },
+    });
+    if (!targetUnit)
+      throw new BadRequestException('Unit not found or not in this venue');
+    const min = targetUnit.minDurationMin ?? 0;
+    const max = targetUnit.maxDurationMin ?? Infinity;
+    if (durationMin < min || durationMin > max) {
+      throw new BadRequestException(
+        `Duration must be between ${min} and ${max} min for this unit`,
+      );
+    }
+
+    const data: Parameters<typeof this.prisma.offering.update>[0]['data'] = {
+      name: dto.name,
+      durationMin: dto.durationMin,
+      price: dto.price ?? null,
+      bufferMin: dto.bufferMin ?? null,
+      isActive: dto.isActive,
+    };
+    if (dto.unitId != null) data.unitId = dto.unitId;
     return this.prisma.offering.update({
       where: { id: offeringId },
-      data: {
-        name: dto.name,
-        durationMin: dto.durationMin,
-        price: dto.price ?? null,
-        bufferMin: dto.bufferMin ?? null,
-        isActive: dto.isActive,
-      },
+      data,
     });
   }
 
@@ -519,6 +552,13 @@ export class VenuesService {
     if (overlappingBlock)
       throw new BadRequestException('Slot is not available');
 
+    const venueSettings = await this.prisma.venue.findUnique({
+      where: { id: venueId },
+    });
+    if (!venueSettings) throw new NotFoundException('Venue not found');
+
+    const initialStatus = venueSettings.autoApprove ? 'CONFIRMED' : 'PENDING';
+
     const booking = await this.prisma.booking.create({
       data: {
         unitId: dto.unitId,
@@ -526,7 +566,7 @@ export class VenuesService {
         customerId,
         startAt,
         endAt,
-        status: 'CONFIRMED',
+        status: initialStatus,
         partySize: dto.partySize ?? null,
         notes: dto.notes ?? null,
       },
@@ -551,6 +591,108 @@ export class VenuesService {
     ).catch(() => {});
 
     return booking;
+  }
+
+  listProviderBookings(providerId: string, status?: 'PENDING' | 'CONFIRMED' | 'CANCELLED' | 'COMPLETED') {
+    return this.prisma.booking.findMany({
+      where: {
+        unit: { venue: { providerId } },
+        ...(status ? { status } : {}),
+      },
+      orderBy: { startAt: 'asc' },
+      include: {
+        unit: {
+          select: {
+            id: true,
+            name: true,
+            venue: { select: { id: true, name: true, city: true, address: true } },
+          },
+        },
+        offering: {
+          select: {
+            id: true,
+            name: true,
+            durationMin: true,
+            price: true,
+          },
+        },
+        customer: {
+          select: { id: true, email: true },
+        },
+      },
+    });
+  }
+
+  async approveBooking(providerId: string, bookingId: string) {
+    const booking = await this.prisma.booking.findUnique({
+      where: { id: bookingId },
+      include: {
+        unit: { include: { venue: { include: { provider: true } } } },
+        customer: true,
+      },
+    });
+    if (!booking) throw new NotFoundException('Booking not found');
+    if (booking.unit.venue.providerId !== providerId)
+      throw new ForbiddenException('Not your venue');
+    if (booking.status !== 'PENDING')
+      throw new BadRequestException('Booking is not pending approval');
+
+    const updated = await this.prisma.booking.update({
+      where: { id: bookingId },
+      data: { status: 'CONFIRMED' },
+      include: {
+        unit: { include: { venue: true } },
+        offering: true,
+        customer: true,
+      },
+    });
+
+    this.notifications.createBookingConfirmed(
+      booking.customerId,
+      bookingId,
+      booking.unit.venueId,
+      booking.unit.venue.name,
+      booking.unit.name,
+      booking.startAt,
+    ).catch(() => {});
+
+    return updated;
+  }
+
+  async rejectBooking(providerId: string, bookingId: string) {
+    const booking = await this.prisma.booking.findUnique({
+      where: { id: bookingId },
+      include: {
+        unit: { include: { venue: true } },
+        customer: true,
+      },
+    });
+    if (!booking) throw new NotFoundException('Booking not found');
+    if (booking.unit.venue.providerId !== providerId)
+      throw new ForbiddenException('Not your venue');
+    if (booking.status !== 'PENDING')
+      throw new BadRequestException('Booking is not pending approval');
+
+    await this.prisma.booking.update({
+      where: { id: bookingId },
+      data: { status: 'CANCELLED' },
+    });
+
+    this.notifications.createBookingCancelled(
+      booking.customerId,
+      booking.unit.venueId,
+      booking.unit.venue.name,
+      booking.startAt,
+    ).catch(() => {});
+
+    return this.prisma.booking.findUnique({
+      where: { id: bookingId },
+      include: {
+        unit: { include: { venue: true } },
+        offering: true,
+        customer: true,
+      },
+    });
   }
 
   listCustomerBookings(customerId: string) {

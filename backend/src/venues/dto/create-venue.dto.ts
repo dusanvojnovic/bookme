@@ -7,4 +7,5 @@ export class CreateVenueDto {
   description?: string;
   address?: string;
   slotStepMin?: number;
+  autoApprove?: boolean;
 }

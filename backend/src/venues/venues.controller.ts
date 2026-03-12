@@ -143,6 +143,36 @@ export class VenuesController {
 
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles('PROVIDER')
+  @Get('provider/bookings')
+  listProviderBookings(
+    @Req() req: Request & { user: AuthUser },
+    @Query('status') status?: 'PENDING' | 'CONFIRMED' | 'CANCELLED' | 'COMPLETED',
+  ) {
+    return this.venues.listProviderBookings(req.user.id, status);
+  }
+
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('PROVIDER')
+  @Patch('provider/bookings/:id/approve')
+  approveBooking(
+    @Req() req: Request & { user: AuthUser },
+    @Param('id') id: string,
+  ) {
+    return this.venues.approveBooking(req.user.id, id);
+  }
+
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('PROVIDER')
+  @Patch('provider/bookings/:id/reject')
+  rejectBooking(
+    @Req() req: Request & { user: AuthUser },
+    @Param('id') id: string,
+  ) {
+    return this.venues.rejectBooking(req.user.id, id);
+  }
+
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('PROVIDER')
   @Post('provider/venue')
   create(
     @Req() req: Request & { user: AuthUser },

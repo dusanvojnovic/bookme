@@ -7,4 +7,5 @@ export class UpdateVenueDto {
   description?: string;
   address?: string;
   slotStepMin?: number;
+  autoApprove?: boolean;
 }

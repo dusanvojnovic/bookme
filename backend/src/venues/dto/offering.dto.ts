@@ -1,4 +1,5 @@
 export class CreateOfferingDto {
+  unitId: string;
   name: string;
   durationMin: number;
   price?: number;
@@ -7,6 +8,7 @@ export class CreateOfferingDto {
 }
 
 export class UpdateOfferingDto {
+  unitId?: string;
   name?: string;
   durationMin?: number;
   price?: number;
