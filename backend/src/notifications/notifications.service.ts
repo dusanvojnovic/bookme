@@ -19,6 +19,27 @@ export class NotificationsService {
     });
   }
 
+  async createBookingConfirmed(
+    customerId: string,
+    bookingId: string,
+    venueId: string,
+    venueName: string,
+    unitName: string,
+    startAt: Date,
+  ) {
+    const dateStr = startAt.toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' });
+    return this.prisma.notification.create({
+      data: {
+        userId: customerId,
+        type: 'BOOKING_CONFIRMED',
+        title: `Booking confirmed: ${venueName}`,
+        body: `${unitName} – ${dateStr}`,
+        bookingId,
+        venueId,
+      },
+    });
+  }
+
   async createBookingCancelled(
     userId: string,
     venueId: string | null,
