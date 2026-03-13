@@ -1200,99 +1200,6 @@ export function VenueDetailsPage() {
 					/>
 				</>
 			)}
-			<Paper variant="outlined" sx={{ p: 2, borderRadius: 2, mb: 2 }}>
-				<Stack
-					direction={{ xs: 'column', md: 'row' }}
-					justifyContent="space-between"
-					alignItems={{ md: 'center' }}
-					spacing={1}
-				>
-					<Box>
-						<Stack direction="row" alignItems="center" spacing={1} flexWrap="wrap">
-							<Typography variant="h5" fontWeight={900}>
-								{venue.name}
-							</Typography>
-							{venue.availableToday ? (
-								<Chip
-									icon={<CheckCircleIcon sx={{ fontSize: 18 }} />}
-									label="Available today"
-									size="small"
-									color="success"
-									variant="outlined"
-								/>
-							) : venue.nextAvailableDay ? (
-								<Chip
-									icon={<ScheduleIcon sx={{ fontSize: 18 }} />}
-									label={`Next: ${venue.nextAvailableDay}`}
-									size="small"
-									variant="outlined"
-								/>
-							) : null}
-							{venue.avgRating != null && venue.reviewsCount != null && venue.reviewsCount > 0 && (
-								<Stack direction="row" alignItems="center" spacing={0.5}>
-									<StarIcon sx={{ color: 'warning.main', fontSize: 22 }} />
-									<Typography fontWeight={700}>
-										{venue.avgRating}
-									</Typography>
-									<Button
-										size="small"
-										variant="text"
-										onClick={() => setReviewsDialogOpen(true)}
-										sx={{ textTransform: 'none', minWidth: 'auto', px: 0.5 }}
-									>
-										({venue.reviewsCount} {venue.reviewsCount === 1 ? 'review' : 'reviews'})
-									</Button>
-								</Stack>
-							)}
-						</Stack>
-						<Stack direction="row" spacing={0.75} alignItems="center">
-							<LocationOnIcon fontSize="small" />
-							<Typography variant="body2" color="text.secondary">
-								{venue.city}
-								{venue.address ? ` • ${venue.address}` : ''}
-							</Typography>
-						</Stack>
-						{venue.description?.trim() && (
-							<Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-								{venue.description.trim()}
-							</Typography>
-						)}
-					</Box>
-
-					<Stack direction="row" spacing={1} flexWrap="wrap">
-						<Button component={Link} to="/dashboard" variant="outlined">
-							Back to dashboard
-						</Button>
-						<Button
-							variant="outlined"
-							startIcon={<ShareIcon />}
-							onClick={handleShare}
-						>
-							Share
-						</Button>
-						{isOwner && (
-							<Button
-								variant={showVenueForm ? 'contained' : 'outlined'}
-								onClick={() => setIsEditingVenue((prev) => !prev)}
-							>
-								{showVenueForm ? 'Close edit' : 'Edit venue'}
-							</Button>
-						)}
-						<Button
-							variant="contained"
-							onClick={() =>
-								navigate({
-									to: '/venues/$venueId/calendar',
-									params: { venueId },
-								})
-							}
-						>
-							Open calendar
-						</Button>
-					</Stack>
-				</Stack>
-			</Paper>
-
 			{venue.reviewsCount != null && venue.reviewsCount > 0 && (
 				<Paper variant="outlined" sx={{ p: 2, borderRadius: 2, mb: 2 }}>
 					<Stack spacing={1.5}>
@@ -1966,26 +1873,106 @@ export function VenueDetailsPage() {
 					</Dialog>
 				)}
 
-				<Box
-					sx={{
-						...(isOwner
-							? {
-									display: 'flex',
-									flexDirection: 'column',
-									gap: 2,
-								}
-							: {
-									display: 'grid',
-									gridTemplateColumns: {
-										xs: '1fr',
-										md: 'minmax(240px, 0.32fr) 1fr',
-									},
-									gap: 2,
-									alignItems: 'start',
-								}),
-					}}
-				>
-					<Paper variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
+				<Stack spacing={2}>
+					<Stack
+						direction={{ xs: 'column', md: 'row' }}
+						spacing={2}
+						alignItems="stretch"
+					>
+						<Paper
+							variant="outlined"
+							sx={{
+								p: 2,
+								borderRadius: 2,
+								flex: { xs: 1, md: 1.5 },
+								display: 'flex',
+								flexDirection: 'column',
+								minHeight: 0,
+							}}
+						>
+							<Stack spacing={1} sx={{ flex: 1 }}>
+								<Stack direction="row" alignItems="center" spacing={1} flexWrap="wrap">
+									<Typography variant="h5" fontWeight={900}>
+										{venue.name}
+									</Typography>
+									{venue.availableToday ? (
+										<Chip
+											icon={<CheckCircleIcon sx={{ fontSize: 18 }} />}
+											label="Available today"
+											size="small"
+											color="success"
+											variant="outlined"
+										/>
+									) : venue.nextAvailableDay ? (
+										<Chip
+											icon={<ScheduleIcon sx={{ fontSize: 18 }} />}
+											label={`Next: ${venue.nextAvailableDay}`}
+											size="small"
+											variant="outlined"
+										/>
+									) : null}
+									{venue.avgRating != null && venue.reviewsCount != null && venue.reviewsCount > 0 && (
+										<Stack direction="row" alignItems="center" spacing={0.5}>
+											<StarIcon sx={{ color: 'warning.main', fontSize: 22 }} />
+											<Typography fontWeight={700}>{venue.avgRating}</Typography>
+											<Button
+												size="small"
+												variant="text"
+												onClick={() => setReviewsDialogOpen(true)}
+												sx={{ textTransform: 'none', minWidth: 'auto', px: 0.5 }}
+											>
+												({venue.reviewsCount} {venue.reviewsCount === 1 ? 'review' : 'reviews'})
+											</Button>
+										</Stack>
+									)}
+								</Stack>
+								<Stack direction="row" spacing={0.75} alignItems="center">
+									<LocationOnIcon fontSize="small" />
+									<Typography variant="body2" color="text.secondary">
+										{venue.city}
+										{venue.address ? ` • ${venue.address}` : ''}
+									</Typography>
+								</Stack>
+								{venue.description?.trim() && (
+									<Typography variant="body2" color="text.secondary">
+										{venue.description.trim()}
+									</Typography>
+								)}
+							</Stack>
+							<Stack
+								direction="row"
+								spacing={1}
+								flexWrap="wrap"
+								sx={{ mt: 'auto', pt: 2, borderTop: 1, borderColor: 'divider' }}
+							>
+								<Button component={Link} to="/dashboard" variant="outlined">
+									Back to dashboard
+								</Button>
+								<Button variant="outlined" startIcon={<ShareIcon />} onClick={handleShare}>
+									Share
+								</Button>
+								{isOwner && (
+									<Button
+										variant={showVenueForm ? 'contained' : 'outlined'}
+										onClick={() => setIsEditingVenue((prev) => !prev)}
+									>
+										{showVenueForm ? 'Close edit' : 'Edit venue'}
+									</Button>
+								)}
+								<Button
+									variant="contained"
+									onClick={() =>
+										navigate({
+											to: '/venues/$venueId/calendar',
+											params: { venueId },
+										})
+									}
+								>
+									Open calendar
+								</Button>
+							</Stack>
+						</Paper>
+						<Paper variant="outlined" sx={{ p: 2, borderRadius: 2, flex: 1 }}>
 						<Stack spacing={2}>
 							<Typography fontWeight={800}>Opening hours</Typography>
 
@@ -2174,6 +2161,7 @@ export function VenueDetailsPage() {
 						)}
 					</Stack>
 				</Paper>
+					</Stack>
 
 				<Paper variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
 					<Stack
@@ -2631,14 +2619,7 @@ export function VenueDetailsPage() {
 						)}
 				</Paper>
 
-				<Paper
-					variant="outlined"
-					sx={{
-						p: 2,
-						borderRadius: 2,
-						...(isOwner ? {} : { gridColumn: '1 / -1' }),
-					}}
-				>
+				<Paper variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
 					<Stack
 						direction={{ xs: 'column', md: 'row' }}
 						justifyContent="space-between"
@@ -2951,7 +2932,7 @@ export function VenueDetailsPage() {
 							</TableContainer>
 						)}
 				</Paper>
-				</Box>
+				</Stack>
 
 				{isOwner && (
 					<Paper variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
