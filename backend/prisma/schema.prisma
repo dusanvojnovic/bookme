@@ -73,6 +73,7 @@ model Venue {
     city        String
     address     String?
     slotStepMin Int?
+    imageUrl    String?
 
     ratingAvg   Float @default(0)
     ratingCount Int   @default(0)
