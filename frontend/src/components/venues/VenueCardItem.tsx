@@ -1,6 +1,8 @@
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import FavoriteIcon from '@mui/icons-material/Favorite';
 import FavoriteBorderIcon from '@mui/icons-material/FavoriteBorder';
 import LocationOnIcon from '@mui/icons-material/LocationOn';
+import ScheduleIcon from '@mui/icons-material/Schedule';
 import StarIcon from '@mui/icons-material/Star';
 import {
     Box,
@@ -132,6 +134,22 @@ export function VenueCardItem({
 
 			<Box sx={{ p: 2.5 }}>
 				<Stack direction="row" gap={1.25} flexWrap="wrap" alignItems="center">
+					{v.availableToday ? (
+						<Chip
+							icon={<CheckCircleIcon sx={{ fontSize: 18 }} />}
+							label="Available today"
+							size="medium"
+							variant="outlined"
+							color="success"
+						/>
+					) : v.nextAvailableDay ? (
+						<Chip
+							icon={<ScheduleIcon sx={{ fontSize: 18 }} />}
+							label={`Next: ${v.nextAvailableDay}`}
+							size="medium"
+							variant="outlined"
+						/>
+					) : null}
 					{v.avgRating != null && (
 						<Chip
 							icon={<StarIcon sx={{ fontSize: 18 }} />}
