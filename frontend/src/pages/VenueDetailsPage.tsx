@@ -7,6 +7,7 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import LocationOnIcon from '@mui/icons-material/LocationOn';
 import PhotoCameraIcon from '@mui/icons-material/PhotoCamera';
 import ScheduleIcon from '@mui/icons-material/Schedule';
+import ShareIcon from '@mui/icons-material/Share';
 import StarIcon from '@mui/icons-material/Star';
 import {
     Alert,
@@ -620,6 +621,7 @@ export function VenueDetailsPage() {
 	} | null>(null);
 	const [reviewsDialogOpen, setReviewsDialogOpen] = React.useState(false);
 	const [galleryLightboxOpen, setGalleryLightboxOpen] = React.useState(false);
+	const [shareSnackbar, setShareSnackbar] = React.useState<'copied' | 'shared' | false>(false);
 
 	React.useEffect(() => {
 		if (!venue) return;
@@ -661,6 +663,26 @@ export function VenueDetailsPage() {
 	const isOwner =
 		!!venue && user?.role === 'PROVIDER' && user.id === venue.providerId;
 	const showVenueForm = isOwner && isEditingVenue;
+
+	const shareUrl = `${window.location.origin}/venues/${venueId}`;
+	const handleShare = async () => {
+		try {
+			if (navigator.share && venue) {
+				await navigator.share({
+					title: venue.name,
+					text: venue.description?.trim() || venue.name,
+					url: shareUrl,
+				});
+				setShareSnackbar('shared');
+			} else {
+				await navigator.clipboard.writeText(shareUrl);
+				setShareSnackbar('copied');
+			}
+		} catch {
+			await navigator.clipboard.writeText(shareUrl);
+			setShareSnackbar('copied');
+		}
+	};
 
 	const updateMutation = useMutation({
 		mutationFn: (payload: UpdateVenuePayload) =>
@@ -1096,6 +1118,20 @@ export function VenueDetailsPage() {
 					</Alert>
 				</Snackbar>
 			)}
+			<Snackbar
+				open={!!shareSnackbar}
+				autoHideDuration={2500}
+				onClose={() => setShareSnackbar(false)}
+				anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+			>
+				<Alert
+					severity="success"
+					onClose={() => setShareSnackbar(false)}
+					sx={{ alignItems: 'center' }}
+				>
+					{shareSnackbar === 'shared' ? 'Shared!' : 'Link copied to clipboard'}
+				</Alert>
+			</Snackbar>
 			<Dialog
 				open={!!deleteUnitId}
 				onClose={() => setDeleteUnitId(null)}
@@ -1223,9 +1259,16 @@ export function VenueDetailsPage() {
 						)}
 					</Box>
 
-					<Stack direction="row" spacing={1}>
+					<Stack direction="row" spacing={1} flexWrap="wrap">
 						<Button component={Link} to="/dashboard" variant="outlined">
 							Back to dashboard
+						</Button>
+						<Button
+							variant="outlined"
+							startIcon={<ShareIcon />}
+							onClick={handleShare}
+						>
+							Share
 						</Button>
 						{isOwner && (
 							<Button
