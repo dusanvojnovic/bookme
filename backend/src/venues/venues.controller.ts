@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Delete,
@@ -8,8 +9,14 @@ import {
   Post,
   Query,
   Req,
+  UploadedFile,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { diskStorage } from 'multer';
+import { existsSync, mkdirSync } from 'fs';
+import { join } from 'path';
 import { AuthGuard } from '@nestjs/passport';
 import { Roles } from '../auth/roles.decorator';
 import { RolesGuard } from '../auth/roles.guard';
@@ -193,6 +200,50 @@ export class VenuesController {
   @Delete('provider/venues/:id')
   remove(@Req() req: any) {
     return this.venues.remove(req.user.id, req.params.id);
+  }
+
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('PROVIDER')
+  @Post('provider/venues/:id/image')
+  @UseInterceptors(
+    FileInterceptor('file', {
+      storage: diskStorage({
+        destination: (req, file, cb) => {
+          const dest = join(process.cwd(), 'uploads');
+          if (!existsSync(dest)) mkdirSync(dest, { recursive: true });
+          cb(null, dest);
+        },
+        filename: (req, file, cb) => {
+          const ext = (file.originalname.split('.').pop() || 'jpg').toLowerCase();
+          const safeExt = ['jpg', 'jpeg', 'png', 'webp', 'gif'].includes(ext) ? ext : 'jpg';
+          cb(null, `venue-${(req as any).params.id}-${Date.now()}.${safeExt}`);
+        },
+      }),
+      limits: { fileSize: 5 * 1024 * 1024 },
+      fileFilter: (req, file, cb) => {
+        const allowed = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+        if (allowed.includes(file.mimetype)) cb(null, true);
+        else cb(new BadRequestException('Only images (JPEG, PNG, WebP, GIF) allowed'), false);
+      },
+    }),
+  )
+  uploadImage(
+    @Req() req: Request & { user: AuthUser },
+    @Param('id') id: string,
+    @UploadedFile() file: Express.Multer.File,
+  ) {
+    if (!file) throw new BadRequestException('No file uploaded');
+    return this.venues.uploadImage(req.user.id, id, file);
+  }
+
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('PROVIDER')
+  @Delete('provider/venues/:id/image')
+  removeImage(
+    @Req() req: Request & { user: AuthUser },
+    @Param('id') id: string,
+  ) {
+    return this.venues.removeImage(req.user.id, id);
   }
 
   @UseGuards(AuthGuard('jwt'), RolesGuard)

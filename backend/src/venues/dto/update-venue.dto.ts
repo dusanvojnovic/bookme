@@ -8,4 +8,5 @@ export class UpdateVenueDto {
   address?: string;
   slotStepMin?: number;
   autoApprove?: boolean;
+  imageUrl?: string | null;
 }

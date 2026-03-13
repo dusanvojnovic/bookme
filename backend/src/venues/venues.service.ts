@@ -4,6 +4,8 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { join } from 'path';
+import { existsSync, mkdirSync } from 'fs';
 import { NotificationsService } from '../notifications/notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateUnitDto, UpdateUnitDto } from './dto/create-unit.dto';
@@ -58,13 +60,47 @@ export class VenuesService {
         ...(dto.address !== undefined && { address: dto.address }),
         ...(dto.slotStepMin !== undefined && { slotStepMin: dto.slotStepMin }),
         ...(dto.autoApprove !== undefined && { autoApprove: dto.autoApprove }),
+        ...(dto.imageUrl !== undefined && { imageUrl: dto.imageUrl }),
       },
+    });
+  }
+
+  async uploadImage(
+    providerId: string,
+    venueId: string,
+    file: Express.Multer.File,
+  ) {
+    const venue = await this.prisma.venue.findUnique({
+      where: { id: venueId },
+    });
+    if (!venue) throw new NotFoundException('Venue not found');
+    if (venue.providerId !== providerId)
+      throw new ForbiddenException('Not your venue');
+
+    const imagePath = `/uploads/${file.filename}`;
+    return this.prisma.venue.update({
+      where: { id: venueId },
+      data: { imageUrl: imagePath },
+    });
+  }
+
+  async removeImage(providerId: string, venueId: string) {
+    const venue = await this.prisma.venue.findUnique({
+      where: { id: venueId },
+    });
+    if (!venue) throw new NotFoundException('Venue not found');
+    if (venue.providerId !== providerId)
+      throw new ForbiddenException('Not your venue');
+
+    return this.prisma.venue.update({
+      where: { id: venueId },
+      data: { imageUrl: null },
     });
   }
 
   async remove(providerId: string, venueId: string) {
     const venue = await this.prisma.venue.findUnique({
-      where: { id: providerId },
+      where: { id: venueId },
     });
 
     if (!venue) throw new NotFoundException('Venue not found');
@@ -121,6 +157,7 @@ export class VenuesService {
         category: venue.category,
         city: venue.city,
         address: venue.address,
+        imageUrl: venue.imageUrl,
         unitsCount: venue._count.units,
         offeringsCount: venue._count.offerings,
         priceFrom,
