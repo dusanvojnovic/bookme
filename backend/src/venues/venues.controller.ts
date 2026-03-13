@@ -238,12 +238,13 @@ export class VenuesController {
 
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles('PROVIDER')
-  @Delete('provider/venues/:id/image')
+  @Delete('provider/venues/:id/images/:imageId')
   removeImage(
     @Req() req: Request & { user: AuthUser },
     @Param('id') id: string,
+    @Param('imageId') imageId: string,
   ) {
-    return this.venues.removeImage(req.user.id, id);
+    return this.venues.removeImage(req.user.id, id, imageId);
   }
 
   @UseGuards(AuthGuard('jwt'), RolesGuard)

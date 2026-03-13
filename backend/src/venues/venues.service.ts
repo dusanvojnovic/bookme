@@ -72,29 +72,34 @@ export class VenuesService {
   ) {
     const venue = await this.prisma.venue.findUnique({
       where: { id: venueId },
+      include: { images: { orderBy: { order: 'asc' } } },
     });
     if (!venue) throw new NotFoundException('Venue not found');
     if (venue.providerId !== providerId)
       throw new ForbiddenException('Not your venue');
 
     const imagePath = `/uploads/${file.filename}`;
-    return this.prisma.venue.update({
-      where: { id: venueId },
-      data: { imageUrl: imagePath },
+    const nextOrder = venue.images.length > 0
+      ? Math.max(...venue.images.map((i) => i.order)) + 1
+      : 0;
+
+    return this.prisma.venueImage.create({
+      data: { venueId, path: imagePath, order: nextOrder },
     });
   }
 
-  async removeImage(providerId: string, venueId: string) {
-    const venue = await this.prisma.venue.findUnique({
-      where: { id: venueId },
+  async removeImage(providerId: string, venueId: string, imageId: string) {
+    const image = await this.prisma.venueImage.findUnique({
+      where: { id: imageId },
+      include: { venue: true },
     });
-    if (!venue) throw new NotFoundException('Venue not found');
-    if (venue.providerId !== providerId)
+    if (!image || image.venueId !== venueId)
+      throw new NotFoundException('Image not found');
+    if (image.venue.providerId !== providerId)
       throw new ForbiddenException('Not your venue');
 
-    return this.prisma.venue.update({
-      where: { id: venueId },
-      data: { imageUrl: null },
+    return this.prisma.venueImage.delete({
+      where: { id: imageId },
     });
   }
 
@@ -134,8 +139,13 @@ export class VenuesService {
         _count: { select: { units: true, offerings: true } },
         offerings: { select: { price: true }, where: { isActive: true } },
         reviews: { select: { rating: true } },
+        schedules: { select: { dayOfWeek: true } },
+        images: { orderBy: { order: 'asc' }, select: { id: true, path: true, order: true } },
       },
     });
+
+    const today = new Date().getDay();
+    const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
     return venues.map((venue) => {
       const prices = venue.offerings
@@ -151,18 +161,37 @@ export class VenuesService {
             10
           : null;
 
+      const scheduleDays = [...new Set(venue.schedules.map((s) => s.dayOfWeek))];
+      const availableToday = scheduleDays.includes(today);
+      let nextAvailableDay: string | null = null;
+      if (!availableToday && scheduleDays.length > 0) {
+        for (let i = 1; i <= 7; i++) {
+          const d = (today + i) % 7;
+          if (scheduleDays.includes(d)) {
+            nextAvailableDay = i === 1 ? 'Tomorrow' : dayNames[d];
+            break;
+          }
+        }
+      }
+
+      const firstImage = venue.images[0];
+      const imageUrl = firstImage?.path ?? venue.imageUrl;
+
       return {
         id: venue.id,
         name: venue.name,
         category: venue.category,
         city: venue.city,
         address: venue.address,
-        imageUrl: venue.imageUrl,
+        imageUrl,
+        images: venue.images.map((i) => ({ id: i.id, path: i.path, order: i.order })),
         unitsCount: venue._count.units,
         offeringsCount: venue._count.offerings,
         priceFrom,
         avgRating,
         reviewsCount,
+        availableToday,
+        nextAvailableDay,
       };
     });
   }
@@ -174,6 +203,7 @@ export class VenuesService {
         include: {
           units: true,
           offerings: true,
+          images: { orderBy: { order: 'asc' } },
           reviews: {
             orderBy: { createdAt: 'desc' },
             select: {
@@ -200,10 +230,27 @@ export class VenuesService {
         ? Math.round(reviewStats._avg.rating * 10) / 10
         : null;
 
+    const today = new Date().getDay();
+    const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    const scheduleDays = [...new Set(venue.schedules.map((s) => s.dayOfWeek))];
+    const availableToday = scheduleDays.includes(today);
+    let nextAvailableDay: string | null = null;
+    if (!availableToday && scheduleDays.length > 0) {
+      for (let i = 1; i <= 7; i++) {
+        const d = (today + i) % 7;
+        if (scheduleDays.includes(d)) {
+          nextAvailableDay = i === 1 ? 'Tomorrow' : dayNames[d];
+          break;
+        }
+      }
+    }
+
     return {
       ...venue,
       avgRating,
       reviewsCount: reviewStats._count,
+      availableToday,
+      nextAvailableDay,
     };
   }
 
