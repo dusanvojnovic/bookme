@@ -1,22 +1,28 @@
+import ListIcon from '@mui/icons-material/List';
+import MapIcon from '@mui/icons-material/Map';
 import SearchIcon from '@mui/icons-material/Search';
 import TuneIcon from '@mui/icons-material/Tune';
 import {
+	Autocomplete,
 	Box,
 	Button,
 	Chip,
 	Divider,
 	InputAdornment,
 	MenuItem,
+	Pagination,
 	Paper,
 	Select,
 	Skeleton,
 	Stack,
 	TextField,
+	ToggleButton,
+	ToggleButtonGroup,
 	Typography,
 } from '@mui/material';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
-import { useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
 	addFavorite,
 	fetchFavorites,
@@ -24,19 +30,51 @@ import {
 	removeFavorite,
 } from '../../api/customer.api';
 import { useAuthStore } from '../../store/auth.store';
+import { searchAddresses } from '../../utils/geocode';
+import { VenueMap } from './VenueMap';
 import { VenueCardItem } from '../venues/VenueCardItem';
+
+const ITEMS_PER_PAGE = 6;
 
 export function CustomerDashboard() {
 	const token = useAuthStore((s) => s.token);
 	const user = useAuthStore((s) => s.user);
+	const [qInput, setQInput] = useState('');
 	const [q, setQ] = useState('');
 	const [city, setCity] = useState('all');
 	const [category, setCategory] = useState('all');
 	const [sortBy, setSortBy] = useState('none');
 	const [minRating, setMinRating] = useState<string>('all');
 	const [favoritesOnly, setFavoritesOnly] = useState(false);
+	const [viewMode, setViewMode] = useState<'list' | 'map'>('list');
+	const [page, setPage] = useState(1);
+	const [addressOptions, setAddressOptions] = useState<
+		Array<{ displayName: string; lat: number; lng: number }>
+	>([]);
+	const [addressLoading, setAddressLoading] = useState(false);
 	const navigate = useNavigate();
 	const queryClient = useQueryClient();
+
+	// Debounce search query for API (prevents UI jump on every keystroke)
+	useEffect(() => {
+		const t = setTimeout(() => setQ(qInput), 350);
+		return () => clearTimeout(t);
+	}, [qInput]);
+
+	// Debounced address autocomplete
+	useEffect(() => {
+		if (qInput.length < 2) {
+			setAddressOptions([]);
+			return;
+		}
+		const t = setTimeout(async () => {
+			setAddressLoading(true);
+			const results = await searchAddresses(qInput);
+			setAddressOptions(results);
+			setAddressLoading(false);
+		}, 400);
+		return () => clearTimeout(t);
+	}, [qInput]);
 
 	const {
 		data = [],
@@ -46,6 +84,7 @@ export function CustomerDashboard() {
 		queryKey: ['venues', q, city, category],
 		queryFn: () => fetchVenues({ q, city, category }),
 		staleTime: 30_000,
+		placeholderData: (prev) => prev,
 	});
 
 	const { data: favoriteIds = [] } = useQuery({
@@ -125,6 +164,28 @@ export function CustomerDashboard() {
 		return items;
 	}, [data, sortBy, minRating, favoritesOnly, favoriteIds]);
 
+	// Pagination
+	const totalPages = Math.max(
+		1,
+		Math.ceil(filteredAndSortedData.length / ITEMS_PER_PAGE),
+	);
+	const paginatedData = useMemo(() => {
+		const start = (page - 1) * ITEMS_PER_PAGE;
+		return filteredAndSortedData.slice(start, start + ITEMS_PER_PAGE);
+	}, [filteredAndSortedData, page]);
+
+	// Reset page when filters change
+	useEffect(() => {
+		setPage(1);
+	}, [q, city, category, sortBy, minRating, favoritesOnly]);
+
+	const handleVenueClick = useCallback(
+		(v: { id: string }) => {
+			navigate({ to: '/venues/$venueId', params: { venueId: v.id } });
+		},
+		[navigate],
+	);
+
 	return (
 		<Box
 			sx={{
@@ -159,6 +220,7 @@ export function CustomerDashboard() {
 						size="small"
 						onClick={() => {
 							setQ('');
+							setQInput('');
 							setCity('all');
 							setCategory('all');
 							setSortBy('none');
@@ -171,19 +233,35 @@ export function CustomerDashboard() {
 				</Stack>
 
 				<Stack spacing={2}>
-					<TextField
-						value={q}
-						onChange={(e) => setQ(e.target.value)}
-						placeholder="Search (name, city, address)…"
-						slotProps={{
-							input: {
-								startAdornment: (
-									<InputAdornment position="start">
-										<SearchIcon fontSize="small" />
-									</InputAdornment>
-								),
-							},
+					<Autocomplete
+						freeSolo
+						options={addressOptions.map((o) => o.displayName)}
+						loading={addressLoading}
+						inputValue={qInput}
+						onInputChange={(_, v) => setQInput(v)}
+						onChange={(_, v) => {
+							const str = typeof v === 'string' ? v : v ?? '';
+							// Nominatim returns "Place, Region, Country" - use first part for venue search
+							const searchTerm = str.split(',')[0].trim() || str;
+							setQInput(searchTerm);
+							setQ(searchTerm);
 						}}
+						renderInput={(params) => (
+							<TextField
+								{...params}
+								placeholder="Search by name, city, or address…"
+								slotProps={{
+									input: {
+										...params.InputProps,
+										startAdornment: (
+											<InputAdornment position="start">
+												<SearchIcon fontSize="small" />
+											</InputAdornment>
+										),
+									},
+								}}
+							/>
+						)}
 					/>
 
 					<Box>
@@ -313,9 +391,22 @@ export function CustomerDashboard() {
 							))}
 						</Stack>
 					</Stack>
-					<Button variant="outlined" fullWidth sx={{ mt: 2 }}>
-						Map (soon)
-					</Button>
+					<ToggleButtonGroup
+						value={viewMode}
+						exclusive
+						onChange={(_, v) => v != null && setViewMode(v)}
+						fullWidth
+						sx={{ mt: 2 }}
+					>
+						<ToggleButton value="list" aria-label="list view">
+							<ListIcon sx={{ mr: 0.5 }} />
+							List
+						</ToggleButton>
+						<ToggleButton value="map" aria-label="map view">
+							<MapIcon sx={{ mr: 0.5 }} />
+							Map
+						</ToggleButton>
+					</ToggleButtonGroup>
 				</Stack>
 			</Paper>
 
@@ -361,10 +452,14 @@ export function CustomerDashboard() {
 					direction="row"
 					justifyContent="space-between"
 					alignItems="center"
+					flexWrap="wrap"
+					gap={1}
 					sx={{ mb: 1.5 }}
 				>
 					<Typography variant="body2" color="text.secondary">
 						Showing: <b>{isLoading ? '...' : filteredAndSortedData.length}</b>
+						{viewMode === 'list' &&
+							` (page ${page}/${totalPages})`}
 					</Typography>
 					{isError && (
 						<Typography variant="body2" color="error">
@@ -373,65 +468,86 @@ export function CustomerDashboard() {
 					)}
 				</Stack>
 
-				<Box
-					sx={{
-						display: 'grid',
-						gridTemplateColumns: {
-							xs: '1fr',
-							sm: '1fr 1fr',
-							xl: '1fr 1fr',
-						},
-						gap: 2.5,
-					}}
-				>
-					{isLoading
-						? Array.from({ length: 6 }).map((_, i) => (
-								<Paper
-									key={i}
-									variant="outlined"
-									sx={{ borderRadius: 2.5, overflow: 'hidden' }}
-								>
-									<Skeleton
-										variant="rectangular"
-										height={180}
-									/>
-									<Box sx={{ p: 2.5 }}>
-										<Skeleton width="70%" />
-										<Skeleton width="45%" />
-										<Skeleton width="90%" />
-									</Box>
-								</Paper>
-							))
-						: filteredAndSortedData.map((v) => (
-								<VenueCardItem
-									key={v.id}
-									v={v}
-									onOpen={() =>
-										navigate({
-											to: '/venues/$venueId',
-											params: { venueId: v.id },
-										})
-									}
-									isFavorite={
-										user?.role === 'CUSTOMER'
-											? favoriteIds.includes(v.id)
-											: undefined
-									}
-									onToggleFavorite={
-										user?.role === 'CUSTOMER'
-											? (e) => {
-													e.stopPropagation();
-													if (favoriteIds.includes(v.id)) {
-														removeFavoriteMutation.mutate(v.id);
-													} else {
-														addFavoriteMutation.mutate(v.id);
-													}
-												}
-											: undefined
-									}
+				{viewMode === 'map' ? (
+					<VenueMap
+						venues={filteredAndSortedData}
+						onVenueClick={handleVenueClick}
+					/>
+				) : (
+					<>
+						<Box
+							sx={{
+								display: 'grid',
+								gridTemplateColumns: {
+									xs: '1fr',
+									sm: '1fr 1fr',
+									xl: '1fr 1fr',
+								},
+								gap: 2.5,
+							}}
+						>
+							{isLoading
+								? Array.from({ length: 6 }).map((_, i) => (
+										<Paper
+											key={i}
+											variant="outlined"
+											sx={{ borderRadius: 2.5, overflow: 'hidden' }}
+										>
+											<Skeleton
+												variant="rectangular"
+												height={180}
+											/>
+											<Box sx={{ p: 2.5 }}>
+												<Skeleton width="70%" />
+												<Skeleton width="45%" />
+												<Skeleton width="90%" />
+											</Box>
+										</Paper>
+									))
+								: paginatedData.map((v) => (
+										<VenueCardItem
+											key={v.id}
+											v={v}
+											onOpen={() =>
+												navigate({
+													to: '/venues/$venueId',
+													params: { venueId: v.id },
+												})
+											}
+											isFavorite={
+												user?.role === 'CUSTOMER'
+													? favoriteIds.includes(v.id)
+													: undefined
+											}
+											onToggleFavorite={
+												user?.role === 'CUSTOMER'
+													? (e) => {
+															e.stopPropagation();
+															if (favoriteIds.includes(v.id)) {
+																removeFavoriteMutation.mutate(v.id);
+															} else {
+																addFavoriteMutation.mutate(v.id);
+															}
+														}
+													: undefined
+											}
+										/>
+									))}
+						</Box>
+						{totalPages > 1 && !isLoading && (
+							<Stack alignItems="center" sx={{ mt: 3 }}>
+								<Pagination
+									count={totalPages}
+									page={page}
+									onChange={(_, p) => setPage(p)}
+									color="primary"
+									showFirstButton
+									showLastButton
 								/>
-							))}
-				</Box>
+							</Stack>
+						)}
+					</>
+				)}
 			</Box>
 		</Box>
 	);

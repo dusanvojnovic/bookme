@@ -131,6 +131,8 @@ export class VenuesService {
               OR: [
                 { name: { contains: q, mode: 'insensitive' } },
                 { description: { contains: q, mode: 'insensitive' } },
+                { address: { contains: q, mode: 'insensitive' } },
+                { city: { contains: q, mode: 'insensitive' } },
               ],
             }
           : {}),

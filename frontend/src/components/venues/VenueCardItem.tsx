@@ -17,6 +17,7 @@ import {
 
 import { api } from '../../api/api';
 import { type VenueCard } from '../../types/venue';
+import { formatRsd } from '../../utils/format';
 
 function getImageUrl(imageUrl: string | null | undefined): string | null {
 	if (!imageUrl) return null;
@@ -189,12 +190,4 @@ export function VenueCardItem({
 			</Box>
 		</Paper>
 	);
-}
-
-function formatRsd(value: number) {
-	return new Intl.NumberFormat('sr-RS', {
-		style: 'currency',
-		currency: 'RSD',
-		maximumFractionDigits: 0,
-	}).format(value);
 }
