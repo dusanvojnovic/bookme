@@ -11,51 +11,20 @@ import {
 	Typography,
 } from '@mui/material';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import * as React from 'react';
-import { api } from '../../api/api';
+import { useState } from 'react';
+import {
+	fetchNotifications,
+	fetchUnreadCount,
+	markAllNotificationsRead,
+	markNotificationAsRead,
+} from '../../api/customer.api';
+import type { AppNotification } from '../../types/notification';
 import { useAuthStore } from '../../store/auth.store';
-
-type Notification = {
-	id: string;
-	type: string;
-	title: string;
-	body: string | null;
-	readAt: string | null;
-	venueId: string | null;
-	bookingId: string | null;
-	createdAt: string;
-};
-
-async function fetchUnreadCount(token: string) {
-	const res = await api.get<{ count: number }>('/notifications/unread-count', {
-		headers: { Authorization: `Bearer ${token}` },
-	});
-	return res.data.count;
-}
-
-async function fetchNotifications(token: string) {
-	const res = await api.get<Notification[]>('/notifications', {
-		headers: { Authorization: `Bearer ${token}` },
-	});
-	return res.data;
-}
-
-async function markAllRead(token: string) {
-	await api.patch('/notifications/read-all', null, {
-		headers: { Authorization: `Bearer ${token}` },
-	});
-}
-
-async function markAsRead(token: string, id: string) {
-	await api.patch(`/notifications/${id}/read`, null, {
-		headers: { Authorization: `Bearer ${token}` },
-	});
-}
 
 export function NotificationBell() {
 	const token = useAuthStore((s) => s.token);
 	const queryClient = useQueryClient();
-	const [anchor, setAnchor] = React.useState<HTMLElement | null>(null);
+	const [anchor, setAnchor] = useState<HTMLElement | null>(null);
 
 	const { data: count = 0 } = useQuery({
 		queryKey: ['notifications-unread', token],
@@ -73,7 +42,7 @@ export function NotificationBell() {
 	});
 
 	const markAllMutation = useMutation({
-		mutationFn: () => markAllRead(token!),
+		mutationFn: () => markAllNotificationsRead(token!),
 		onSuccess: () => {
 			queryClient.invalidateQueries({ queryKey: ['notifications-unread'] });
 			queryClient.invalidateQueries({ queryKey: ['notifications'] });
@@ -81,7 +50,7 @@ export function NotificationBell() {
 	});
 
 	const markReadMutation = useMutation({
-		mutationFn: (id: string) => markAsRead(token!, id),
+		mutationFn: (id: string) => markNotificationAsRead(token!, id),
 		onSuccess: () => {
 			queryClient.invalidateQueries({ queryKey: ['notifications-unread'] });
 			queryClient.invalidateQueries({ queryKey: ['notifications'] });
@@ -91,7 +60,7 @@ export function NotificationBell() {
 	const open = (e: React.MouseEvent<HTMLElement>) => setAnchor(e.currentTarget);
 	const close = () => setAnchor(null);
 
-	const handleNotificationClick = (n: Notification) => {
+	const handleNotificationClick = (n: AppNotification) => {
 		if (!n.readAt) {
 			markReadMutation.mutate(n.id);
 		}

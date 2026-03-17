@@ -15,49 +15,28 @@ import {
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
 import dayjs from 'dayjs';
-import * as React from 'react';
-import { api } from '../api/api';
+import { useState } from 'react';
+import {
+	cancelBooking,
+	createReview,
+	fetchMyBookings,
+} from '../api/customer.api';
 import { useAuthStore } from '../store/auth.store';
 import { type BookingItem } from '../types/booking';
-
-async function fetchMyBookings(token: string) {
-	const res = await api.get<BookingItem[]>('/customer/bookings', {
-		headers: { Authorization: `Bearer ${token}` },
-	});
-	return res.data;
-}
-
-async function createReview(
-	token: string,
-	bookingId: string,
-	payload: { rating: number; comment?: string },
-) {
-	const res = await api.post(`/customer/bookings/${bookingId}/review`, payload, {
-		headers: { Authorization: `Bearer ${token}` },
-	});
-	return res.data;
-}
-
-async function cancelBooking(token: string, bookingId: string) {
-	const res = await api.patch(`/customer/bookings/${bookingId}/cancel`, {}, {
-		headers: { Authorization: `Bearer ${token}` },
-	});
-	return res.data;
-}
 
 export function MyBookingsPage() {
 	const token = useAuthStore((s) => s.token);
 	const navigate = useNavigate();
 	const queryClient = useQueryClient();
-	const [reviewBooking, setReviewBooking] = React.useState<BookingItem | null>(
+	const [reviewBooking, setReviewBooking] = useState<BookingItem | null>(
 		null,
 	);
-	const [reviewRating, setReviewRating] = React.useState<number | null>(5);
-	const [reviewComment, setReviewComment] = React.useState('');
-	const [reviewError, setReviewError] = React.useState<string | null>(null);
+	const [reviewRating, setReviewRating] = useState<number | null>(5);
+	const [reviewComment, setReviewComment] = useState('');
+	const [reviewError, setReviewError] = useState<string | null>(null);
 	const [cancelConfirmBooking, setCancelConfirmBooking] =
-		React.useState<BookingItem | null>(null);
-	const [filter, setFilter] = React.useState<'active' | 'done'>('active');
+		useState<BookingItem | null>(null);
+	const [filter, setFilter] = useState<'active' | 'done'>('active');
 
 	const {
 		data = [],
@@ -94,7 +73,7 @@ export function MyBookingsPage() {
 		},
 	});
 
-	const [cancelError, setCancelError] = React.useState<string | null>(null);
+	const [cancelError, setCancelError] = useState<string | null>(null);
 
 	const cancelBookingMutation = useMutation({
 		mutationFn: (bookingId: string) => cancelBooking(token!, bookingId),

@@ -16,27 +16,16 @@ import {
 } from '@mui/material';
 import { useNavigate } from '@tanstack/react-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import * as React from 'react';
-import { api } from '../../api/api';
+import { useMemo, useState } from 'react';
+import {
+	approveBooking,
+	createVenue,
+	fetchPendingBookings,
+	fetchProviderVenues,
+	rejectBooking,
+} from '../../api/customer.api';
+import type { CreateVenuePayload } from '../../types/venue';
 import { useAuthStore } from '../../store/auth.store';
-
-type ProviderVenue = {
-	id: string;
-	name: string;
-	category: string;
-	city: string;
-	address?: string | null;
-	description?: string | null;
-};
-
-type CreateVenuePayload = {
-	category: string;
-	name: string;
-	city: string;
-	description?: string;
-	address?: string;
-	autoApprove?: boolean;
-};
 
 const CATEGORY_OPTIONS = [
 	'SPORT',
@@ -45,50 +34,6 @@ const CATEGORY_OPTIONS = [
 	'FOOD',
 	'WELLNESS',
 ];
-
-async function fetchProviderVenues(token: string) {
-	const res = await api.get<ProviderVenue[]>('/provider/venues', {
-		headers: { Authorization: `Bearer ${token}` },
-	});
-	return res.data;
-}
-
-async function createVenue(token: string, payload: CreateVenuePayload) {
-	const res = await api.post<ProviderVenue>('/provider/venue', payload, {
-		headers: { Authorization: `Bearer ${token}` },
-	});
-	return res.data;
-}
-
-type ProviderBooking = {
-	id: string;
-	status: string;
-	startAt: string;
-	endAt: string;
-	unit: { id: string; name: string; venue: { id: string; name: string; city: string; address?: string | null } };
-	offering: { id: string; name: string; durationMin: number; price?: number | null };
-	customer: { id: string; email: string };
-};
-
-async function fetchPendingBookings(token: string) {
-	const res = await api.get<ProviderBooking[]>('/provider/bookings', {
-		params: { status: 'PENDING' },
-		headers: { Authorization: `Bearer ${token}` },
-	});
-	return res.data;
-}
-
-async function approveBooking(token: string, bookingId: string) {
-	await api.patch(`/provider/bookings/${bookingId}/approve`, null, {
-		headers: { Authorization: `Bearer ${token}` },
-	});
-}
-
-async function rejectBooking(token: string, bookingId: string) {
-	await api.patch(`/provider/bookings/${bookingId}/reject`, null, {
-		headers: { Authorization: `Bearer ${token}` },
-	});
-}
 
 const EMPTY_FORM: CreateVenuePayload = {
 	category: 'SPORT',
@@ -102,7 +47,7 @@ const EMPTY_FORM: CreateVenuePayload = {
 export function ProviderDashboard() {
 	const token = useAuthStore((s) => s.token);
 	const queryClient = useQueryClient();
-	const [form, setForm] = React.useState<CreateVenuePayload>(EMPTY_FORM);
+	const [form, setForm] = useState<CreateVenuePayload>(EMPTY_FORM);
 	const navigate = useNavigate();
 
 	const {
@@ -153,7 +98,7 @@ export function ProviderDashboard() {
 		form.city.trim().length > 0 &&
 		form.category.trim().length > 0;
 
-	const metrics = React.useMemo(() => {
+	const metrics = useMemo(() => {
 		const cities = new Set(data.map((venue) => venue.city).filter(Boolean));
 		const categories = new Set(
 			data.map((venue) => venue.category).filter(Boolean),

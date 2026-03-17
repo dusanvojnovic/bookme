@@ -20,52 +20,23 @@ import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import dayjs, { type Dayjs } from 'dayjs';
-import * as React from 'react';
-import { api } from '../api/api';
-import { type VenueDetails } from '../types/venue';
-
-type BookingSlot = {
-	id: string;
-	unitId: string;
-	startAt: string;
-	endAt: string;
-};
-
-type BlockSlot = {
-	id: string;
-	unitId: string;
-	startAt: string;
-	endAt: string;
-	reason?: string | null;
-};
-
-async function fetchVenue(venueId: string) {
-	const res = await api.get<VenueDetails>(`/venues/${venueId}`);
-	return res.data;
-}
-
-async function fetchBookings(venueId: string, date: string) {
-	const res = await api.get<BookingSlot[]>(`/venues/${venueId}/bookings`, {
-		params: { date },
-	});
-	return res.data;
-}
-
-async function fetchBlocks(venueId: string, date: string) {
-	const res = await api.get<BlockSlot[]>(`/venues/${venueId}/blocks`, {
-		params: { date },
-	});
-	return res.data;
-}
+import { useEffect, useMemo, useState } from 'react';
+import {
+	fetchBlocks,
+	fetchBookings,
+	fetchVenue,
+} from '../api/venue.api';
+import type { BookingSlot } from '../types/booking';
+import type { BlockSlot } from '../types/venue';
 
 export function VenueCalendarPage() {
 	const { venueId } = useParams({ from: '/venues/$venueId/calendar' });
 	const navigate = useNavigate();
-	const [selectedDate, setSelectedDate] = React.useState<Dayjs | null>(
+	const [selectedDate, setSelectedDate] = useState<Dayjs | null>(
 		dayjs(),
 	);
-	const [viewMode, setViewMode] = React.useState<'day' | 'week'>('day');
-	const [selectedUnitId, setSelectedUnitId] = React.useState('');
+	const [viewMode, setViewMode] = useState<'day' | 'week'>('day');
+	const [selectedUnitId, setSelectedUnitId] = useState('');
 
 	const {
 		data: venue,
@@ -92,7 +63,7 @@ export function VenueCalendarPage() {
 
 	const weekBase = selectedDate ?? dayjs();
 	const weekStart = weekBase.subtract((weekBase.day() + 6) % 7, 'day');
-	const weekDates = React.useMemo(
+	const weekDates = useMemo(
 		() => Array.from({ length: 7 }, (_, i) => weekStart.add(i, 'day')),
 		[weekStart],
 	);
@@ -112,7 +83,7 @@ export function VenueCalendarPage() {
 			staleTime: 30_000,
 		})),
 	});
-	const weekBookingsByDate = React.useMemo(() => {
+	const weekBookingsByDate = useMemo(() => {
 		const map = new Map<string, BookingSlot[]>();
 		weekDates.forEach((date, index) => {
 			const key = date.format('YYYY-MM-DD');
@@ -120,7 +91,7 @@ export function VenueCalendarPage() {
 		});
 		return map;
 	}, [weekDates, weekQueries]);
-	const weekBlocksByDate = React.useMemo(() => {
+	const weekBlocksByDate = useMemo(() => {
 		const map = new Map<string, BlockSlot[]>();
 		weekDates.forEach((date, index) => {
 			const key = date.format('YYYY-MM-DD');
@@ -134,12 +105,12 @@ export function VenueCalendarPage() {
 		(entry) => entry.dayOfWeek === dayOfWeek,
 	);
 	const slotStepMin = venue?.slotStepMin ?? 30;
-	const slots = React.useMemo(
+	const slots = useMemo(
 		() => generateSlots(daySchedule ?? [], slotStepMin),
 		[daySchedule, slotStepMin],
 	);
 
-	const bookingsByUnit = React.useMemo(() => {
+	const bookingsByUnit = useMemo(() => {
 		const map = new Map<string, BookingSlot[]>();
 		for (const booking of bookings) {
 			if (!map.has(booking.unitId)) map.set(booking.unitId, []);
@@ -147,7 +118,7 @@ export function VenueCalendarPage() {
 		}
 		return map;
 	}, [bookings]);
-	const blocksByUnit = React.useMemo(() => {
+	const blocksByUnit = useMemo(() => {
 		const map = new Map<string, BlockSlot[]>();
 		for (const block of blocks) {
 			if (!map.has(block.unitId)) map.set(block.unitId, []);
@@ -156,7 +127,7 @@ export function VenueCalendarPage() {
 		return map;
 	}, [blocks]);
 
-	React.useEffect(() => {
+	useEffect(() => {
 		if (!selectedUnitId && venue?.units?.length) {
 			setSelectedUnitId(venue.units[0].id);
 		}

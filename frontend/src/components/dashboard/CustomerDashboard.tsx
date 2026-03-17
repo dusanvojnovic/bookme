@@ -16,55 +16,25 @@ import {
 } from '@mui/material';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
-import * as React from 'react';
-import { api } from '../../api/api';
+import { useMemo, useState } from 'react';
+import {
+	addFavorite,
+	fetchFavorites,
+	fetchVenues,
+	removeFavorite,
+} from '../../api/customer.api';
 import { useAuthStore } from '../../store/auth.store';
 import { VenueCardItem } from '../venues/VenueCardItem';
-import { type VenueCard } from '../../types/venue';
-
-async function fetchVenues(params: {
-	q: string;
-	city: string;
-	category: string;
-}) {
-	const res = await api.get<VenueCard[]>('/venues', {
-		params: {
-			q: params.q || undefined,
-			city: params.city === 'all' ? undefined : params.city,
-			category: params.category === 'all' ? undefined : params.category,
-		},
-	});
-	return res.data;
-}
-
-async function fetchFavorites(token: string) {
-	const res = await api.get<string[]>('/customer/favorites', {
-		headers: { Authorization: `Bearer ${token}` },
-	});
-	return res.data;
-}
-
-async function addFavorite(token: string, venueId: string) {
-	await api.post(`/customer/favorites/${venueId}`, {}, {
-		headers: { Authorization: `Bearer ${token}` },
-	});
-}
-
-async function removeFavorite(token: string, venueId: string) {
-	await api.delete(`/customer/favorites/${venueId}`, {
-		headers: { Authorization: `Bearer ${token}` },
-	});
-}
 
 export function CustomerDashboard() {
 	const token = useAuthStore((s) => s.token);
 	const user = useAuthStore((s) => s.user);
-	const [q, setQ] = React.useState('');
-	const [city, setCity] = React.useState('all');
-	const [category, setCategory] = React.useState('all');
-	const [sortBy, setSortBy] = React.useState('none');
-	const [minRating, setMinRating] = React.useState<string>('all');
-	const [favoritesOnly, setFavoritesOnly] = React.useState(false);
+	const [q, setQ] = useState('');
+	const [city, setCity] = useState('all');
+	const [category, setCategory] = useState('all');
+	const [sortBy, setSortBy] = useState('none');
+	const [minRating, setMinRating] = useState<string>('all');
+	const [favoritesOnly, setFavoritesOnly] = useState(false);
 	const navigate = useNavigate();
 	const queryClient = useQueryClient();
 
@@ -100,17 +70,17 @@ export function CustomerDashboard() {
 	});
 
 	// Cities from data (after load)
-	const cities = React.useMemo(() => {
+	const cities = useMemo(() => {
 		const set = new Set(data.map((x) => x.city).filter(Boolean));
 		return ['all', ...Array.from(set)];
 	}, [data]);
 
-	const categories = React.useMemo(() => {
+	const categories = useMemo(() => {
 		const set = new Set(data.map((x) => x.category).filter(Boolean));
 		return ['all', ...Array.from(set)];
 	}, [data]);
 
-	const filteredAndSortedData = React.useMemo(() => {
+	const filteredAndSortedData = useMemo(() => {
 		const minRatingNum =
 			minRating === 'all' ? null : parseFloat(minRating);
 		let items = data;
