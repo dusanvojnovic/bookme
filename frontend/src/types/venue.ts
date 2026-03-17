@@ -75,3 +75,72 @@ export interface VenueDetails {
 	availableToday?: boolean;
 	nextAvailableDay?: string | null;
 }
+
+export type BlockSlot = {
+	id: string;
+	unitId: string;
+	startAt: string;
+	endAt: string;
+	reason?: string | null;
+};
+
+export type ScheduleEntryPayload = {
+	dayOfWeek: number;
+	startTime: string;
+	endTime: string;
+};
+
+export type CreateBlockPayload = {
+	unitId: string;
+	startAt: string;
+	endAt: string;
+	reason?: string;
+};
+
+export type UpdateVenuePayload = {
+	category?: string;
+	name?: string;
+	city?: string;
+	description?: string;
+	address?: string;
+	slotStepMin?: number;
+};
+
+export type CreateUnitPayload = {
+	name: string;
+	unitType: string;
+	capacity?: number;
+	minDurationMin?: number;
+	maxDurationMin?: number;
+	slotStepMin?: number;
+};
+
+export type UpdateUnitPayload = Partial<CreateUnitPayload>;
+
+export type CreateOfferingPayload = {
+	unitId: string;
+	name: string;
+	durationMin: number;
+	price?: number;
+	isActive?: boolean;
+};
+
+export type UpdateOfferingPayload = Partial<CreateOfferingPayload>;
+
+export type ProviderVenue = {
+	id: string;
+	name: string;
+	category: string;
+	city: string;
+	address?: string | null;
+	description?: string | null;
+};
+
+export type CreateVenuePayload = {
+	category: string;
+	name: string;
+	city: string;
+	description?: string;
+	address?: string;
+	autoApprove?: boolean;
+};
