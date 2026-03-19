@@ -8,9 +8,11 @@ import {
 	ListItemButton,
 	ListItemText,
 	Popover,
+	Skeleton,
 	Typography,
 } from '@mui/material';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useNavigate } from '@tanstack/react-router';
 import { useState } from 'react';
 import {
 	fetchNotifications,
@@ -24,6 +26,7 @@ import { useAuthStore } from '../../store/auth.store';
 export function NotificationBell() {
 	const token = useAuthStore((s) => s.token);
 	const queryClient = useQueryClient();
+	const navigate = useNavigate();
 	const [anchor, setAnchor] = useState<HTMLElement | null>(null);
 
 	const { data: count = 0 } = useQuery({
@@ -63,6 +66,12 @@ export function NotificationBell() {
 	const handleNotificationClick = (n: AppNotification) => {
 		if (!n.readAt) {
 			markReadMutation.mutate(n.id);
+		}
+		close();
+		if (n.venueId) {
+			navigate({ to: '/venues/$venueId', params: { venueId: n.venueId } });
+		} else if (n.bookingId) {
+			navigate({ to: '/my-bookings' });
 		}
 	};
 
@@ -117,9 +126,13 @@ export function NotificationBell() {
 					</Box>
 					<List sx={{ maxHeight: 320, overflow: 'auto' }}>
 						{isLoading ? (
-							<ListItem>
-								<ListItemText primary="Loading..." />
-							</ListItem>
+							<>
+								{[1, 2, 3].map((i) => (
+									<ListItem key={i} sx={{ py: 1.5 }}>
+										<Skeleton width="100%" height={48} variant="rounded" />
+									</ListItem>
+								))}
+							</>
 						) : isError ? (
 							<ListItem>
 								<ListItemText primary="Failed to load notifications" />
