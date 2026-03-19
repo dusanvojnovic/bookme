@@ -108,68 +108,71 @@ export function VenueScheduleManager({
 
 				{isOwner ? (
 					<>
-						<Stack
-							direction={{ xs: 'column', md: 'row' }}
-							spacing={1.5}
-							alignItems={{ md: 'center' }}
-						>
-							<TextField
-								select
-								label="Repeat"
-								value={repeatType}
-								onChange={(e) => {
-									const value = String(e.target.value) as
-										| 'everyday'
-										| 'weekdays'
-										| 'weekends'
-										| 'custom';
-									setRepeatType(value);
-									if (value === 'everyday')
-										setSelectedDays([0, 1, 2, 3, 4, 5, 6]);
-									if (value === 'weekdays')
-										setSelectedDays([1, 2, 3, 4, 5]);
-									if (value === 'weekends')
-										setSelectedDays([0, 6]);
-								}}
-								size="small"
-								sx={{ minWidth: 180 }}
+						<Stack spacing={1.5}>
+							<Stack
+								direction={{ xs: 'column', md: 'row' }}
+								spacing={1.5}
+								alignItems={{ md: 'center' }}
 							>
-								<MenuItem value="everyday">Every day</MenuItem>
-								<MenuItem value="weekdays">Weekdays</MenuItem>
-								<MenuItem value="weekends">Weekends</MenuItem>
-								<MenuItem value="custom">Custom</MenuItem>
-							</TextField>
+								<TextField
+									select
+									label="Repeat"
+									value={repeatType}
+									onChange={(e) => {
+										const value = String(e.target.value) as
+											| 'everyday'
+											| 'weekdays'
+											| 'weekends'
+											| 'custom';
+										setRepeatType(value);
+										if (value === 'everyday')
+											setSelectedDays([0, 1, 2, 3, 4, 5, 6]);
+										if (value === 'weekdays')
+											setSelectedDays([1, 2, 3, 4, 5]);
+										if (value === 'weekends')
+											setSelectedDays([0, 6]);
+									}}
+									size="small"
+									sx={{ minWidth: 180 }}
+								>
+									<MenuItem value="everyday">Every day</MenuItem>
+									<MenuItem value="weekdays">Weekdays</MenuItem>
+									<MenuItem value="weekends">Weekends</MenuItem>
+									<MenuItem value="custom">Custom</MenuItem>
+								</TextField>
 
-							<LocalizationProvider dateAdapter={AdapterDayjs}>
-								<TimePicker
-									label="Start"
-									ampm={false}
-									value={scheduleStart}
-									onChange={(value) => setScheduleStart(value)}
-									slotProps={{
-										textField: {
-											size: 'small',
-											sx: { width: 140 },
-										},
-									}}
-								/>
-								<TimePicker
-									label="End"
-									ampm={false}
-									value={scheduleEnd}
-									onChange={(value) => setScheduleEnd(value)}
-									slotProps={{
-										textField: {
-											size: 'small',
-											sx: { width: 140 },
-										},
-									}}
-								/>
-							</LocalizationProvider>
+								<LocalizationProvider dateAdapter={AdapterDayjs}>
+									<TimePicker
+										label="Start"
+										ampm={false}
+										value={scheduleStart}
+										onChange={(value) => setScheduleStart(value)}
+										slotProps={{
+											textField: {
+												size: 'small',
+												sx: { width: 140 },
+											},
+										}}
+									/>
+									<TimePicker
+										label="End"
+										ampm={false}
+										value={scheduleEnd}
+										onChange={(value) => setScheduleEnd(value)}
+										slotProps={{
+											textField: {
+												size: 'small',
+												sx: { width: 140 },
+											},
+										}}
+									/>
+								</LocalizationProvider>
+							</Stack>
 							<Button
 								variant="contained"
 								disabled={!canAddScheduleEntry}
 								size="small"
+								sx={{ alignSelf: 'flex-start' }}
 								onClick={() => {
 									const newEntries = selectedDays.map((day) => ({
 										dayOfWeek: day,
@@ -227,7 +230,7 @@ export function VenueScheduleManager({
 				) : null}
 
 				{displaySchedules.length ? (
-					<Stack spacing={1}>
+					<Stack spacing={1} sx={{ maxWidth: 360, alignSelf: 'flex-start' }}>
 								{displaySchedules
 									.slice()
 									.sort((a, b) => {
