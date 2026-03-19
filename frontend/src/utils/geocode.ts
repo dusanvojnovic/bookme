@@ -1,8 +1,20 @@
+type GeocodeResult = { lat: number; lng: number; displayName: string };
+
+const geocodeCache = new Map<string, GeocodeResult>();
+
+function normalizeQuery(q: string): string {
+	return q.trim().toLowerCase().replace(/\s+/g, ' ');
+}
+
 /** Geocode address/city to lat,lng using Nominatim (OpenStreetMap) - free, no API key */
 export async function geocode(
 	query: string,
-): Promise<{ lat: number; lng: number; displayName: string } | null> {
+): Promise<GeocodeResult | null> {
 	if (!query?.trim()) return null;
+	const key = normalizeQuery(query);
+	const cached = geocodeCache.get(key);
+	if (cached) return cached;
+
 	const res = await fetch(
 		`https://nominatim.openstreetmap.org/search?` +
 			new URLSearchParams({
@@ -15,11 +27,13 @@ export async function geocode(
 	const data = await res.json();
 	if (!Array.isArray(data) || data.length === 0) return null;
 	const r = data[0];
-	return {
+	const result: GeocodeResult = {
 		lat: parseFloat(r.lat),
 		lng: parseFloat(r.lon),
 		displayName: r.display_name ?? query,
 	};
+	geocodeCache.set(key, result);
+	return result;
 }
 
 /** Search addresses for autocomplete */
