@@ -10,6 +10,7 @@ import { NotificationsService } from '../notifications/notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateUnitDto, UpdateUnitDto } from './dto/create-unit.dto';
 import { CreateBookingDto } from './dto/create-booking.dto';
+import { CreateRecurringBookingDto } from './dto/create-recurring-booking.dto';
 import { CreateVenueDto } from './dto/create-venue.dto';
 import { CreateOfferingDto, UpdateOfferingDto } from './dto/offering.dto';
 import { CreateBlockDto } from './dto/create-block.dto';
@@ -121,7 +122,19 @@ export class VenuesService {
     });
   }
 
-  async listPublic(category?: string, city?: string, q?: string) {
+  async listPublic(category?: string, city?: string, q?: string, date?: string) {
+    let dayOfWeek: number | undefined;
+    if (date) {
+      try {
+        const d = new Date(date);
+        if (!Number.isNaN(d.getTime())) {
+          dayOfWeek = d.getDay();
+        }
+      } catch {
+        // ignore invalid date
+      }
+    }
+
     const venues = await this.prisma.venue.findMany({
       where: {
         ...(category ? { category: category as ServiceCategory } : {}),
@@ -134,6 +147,13 @@ export class VenuesService {
                 { address: { contains: q, mode: 'insensitive' } },
                 { city: { contains: q, mode: 'insensitive' } },
               ],
+            }
+          : {}),
+        ...(dayOfWeek != null
+          ? {
+              schedules: {
+                some: { dayOfWeek },
+              },
             }
           : {}),
       },
@@ -677,6 +697,161 @@ export class VenuesService {
     ).catch(() => {});
 
     return booking;
+  }
+
+  async createRecurringBookings(
+    customerId: string,
+    venueId: string,
+    dto: CreateRecurringBookingDto,
+  ) {
+    const count = Math.min(12, Math.max(2, Math.floor(dto.count)));
+    const baseStart = new Date(dto.startAt);
+    if (Number.isNaN(baseStart.getTime()))
+      throw new BadRequestException('Invalid start time');
+
+    const unit = await this.prisma.unit.findUnique({
+      where: { id: dto.unitId },
+    });
+    if (!unit || unit.venueId !== venueId)
+      throw new NotFoundException('Unit not found');
+
+    const offering = await this.prisma.offering.findUnique({
+      where: { id: dto.offeringId },
+    });
+    if (!offering || offering.venueId !== venueId)
+      throw new NotFoundException('Offering not found');
+
+    const venueSettings = await this.prisma.venue.findUnique({
+      where: { id: venueId },
+    });
+    if (!venueSettings) throw new NotFoundException('Venue not found');
+    const initialStatus = venueSettings.autoApprove ? 'CONFIRMED' : 'PENDING';
+
+    const slots: { startAt: Date; endAt: Date }[] = [];
+    for (let i = 0; i < count; i++) {
+      let startAt: Date;
+      if (i === 0) {
+        startAt = baseStart;
+      } else if (dto.repeat === 'weekly') {
+        startAt = new Date(baseStart.getTime() + i * 7 * 24 * 60 * 60 * 1000);
+      } else {
+        startAt = new Date(
+          baseStart.getFullYear(),
+          baseStart.getMonth() + i,
+          baseStart.getDate(),
+          baseStart.getHours(),
+          baseStart.getMinutes(),
+          baseStart.getSeconds(),
+        );
+      }
+      const endAt = new Date(
+        startAt.getTime() + offering.durationMin * 60_000,
+      );
+      slots.push({ startAt, endAt });
+    }
+
+    for (let i = 0; i < slots.length; i++) {
+      const { startAt, endAt } = slots[i];
+      if (startAt <= new Date())
+        throw new BadRequestException(
+          `Slot ${i + 1} (${startAt.toLocaleDateString()}) is in the past`,
+        );
+      if (startAt.toDateString() !== endAt.toDateString())
+        throw new BadRequestException(
+          `Slot ${i + 1}: booking cannot cross day boundary`,
+        );
+
+      const dayOfWeek = startAt.getDay();
+      const schedules = await this.prisma.venueSchedule.findMany({
+        where: { venueId, dayOfWeek },
+      });
+      if (!schedules.length)
+        throw new BadRequestException(
+          `Slot ${i + 1} (${startAt.toLocaleDateString()}): no working hours for this day`,
+        );
+
+      const startMin = startAt.getHours() * 60 + startAt.getMinutes();
+      const endMin = endAt.getHours() * 60 + endAt.getMinutes();
+      const fitsSchedule = schedules.some((entry) => {
+        const scheduleStart = toMinutes(entry.startTime);
+        const scheduleEnd = toMinutes(entry.endTime);
+        return (
+          !Number.isNaN(scheduleStart) &&
+          !Number.isNaN(scheduleEnd) &&
+          scheduleStart <= startMin &&
+          scheduleEnd >= endMin
+        );
+      });
+      if (!fitsSchedule)
+        throw new BadRequestException(
+          `Slot ${i + 1} (${startAt.toLocaleString()}): outside working hours`,
+        );
+
+      const overlappingBooking = await this.prisma.booking.findFirst({
+        where: {
+          unitId: dto.unitId,
+          status: { not: 'CANCELLED' },
+          startAt: { lt: endAt },
+          endAt: { gt: startAt },
+        },
+      });
+      if (overlappingBooking)
+        throw new BadRequestException(
+          `Slot ${i + 1} (${startAt.toLocaleDateString()} ${startAt.toLocaleTimeString()}) is not available`,
+        );
+
+      const overlappingBlock = await this.prisma.block.findFirst({
+        where: {
+          unitId: dto.unitId,
+          startAt: { lt: endAt },
+          endAt: { gt: startAt },
+        },
+      });
+      if (overlappingBlock)
+        throw new BadRequestException(
+          `Slot ${i + 1} (${startAt.toLocaleDateString()}) is blocked`,
+        );
+    }
+
+    const results = await this.prisma.$transaction(
+      slots.map(({ startAt, endAt }) =>
+        this.prisma.booking.create({
+          data: {
+            unitId: dto.unitId,
+            offeringId: dto.offeringId,
+            customerId,
+            startAt,
+            endAt,
+            status: initialStatus,
+            partySize: dto.partySize ?? null,
+            notes: dto.notes ?? null,
+          },
+          include: {
+            unit: { include: { venue: { include: { provider: true } } } },
+            offering: true,
+            customer: true,
+          },
+        }),
+      ),
+    );
+
+    for (const booking of results) {
+      const { unit: bookingUnit, customer } = booking;
+      const venue = bookingUnit.venue;
+      const provider = venue.provider;
+      this.notifications
+        .createNewBooking(
+          provider.id,
+          venue.id,
+          venue.name,
+          bookingUnit.name,
+          booking.id,
+          booking.startAt,
+        )
+        .catch(() => {});
+    }
+
+    return results;
   }
 
   listProviderBookings(providerId: string, status?: 'PENDING' | 'CONFIRMED' | 'CANCELLED' | 'COMPLETED') {

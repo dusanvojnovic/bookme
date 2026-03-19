@@ -23,6 +23,7 @@ import { RolesGuard } from '../auth/roles.guard';
 import { CreateUnitDto, UpdateUnitDto } from './dto/create-unit.dto';
 import { CreateVenueDto } from './dto/create-venue.dto';
 import { CreateBookingDto } from './dto/create-booking.dto';
+import { CreateRecurringBookingDto } from './dto/create-recurring-booking.dto';
 import { CreateOfferingDto, UpdateOfferingDto } from './dto/offering.dto';
 import { CreateBlockDto } from './dto/create-block.dto';
 import { CreateReviewDto } from './dto/create-review.dto';
@@ -49,8 +50,9 @@ export class VenuesController {
     @Query('category') category?: string,
     @Query('city') city?: string,
     @Query('q') q?: string,
+    @Query('date') date?: string,
   ) {
-    return this.venues.listPublic(category, city, q);
+    return this.venues.listPublic(category, city, q, date);
   }
 
   @Get('venues/:id')
@@ -72,6 +74,17 @@ export class VenuesController {
     @Query('date') date: string,
   ) {
     return this.venues.getBlocksForDate(id, date);
+  }
+
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('CUSTOMER')
+  @Post('venues/:id/bookings/recurring')
+  createRecurringBookings(
+    @Req() req: Request & { user: AuthUser },
+    @Param('id') id: string,
+    @Body() dto: CreateRecurringBookingDto,
+  ) {
+    return this.venues.createRecurringBookings(req.user.id, id, dto);
   }
 
   @UseGuards(AuthGuard('jwt'), RolesGuard)
