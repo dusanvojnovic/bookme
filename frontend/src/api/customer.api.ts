@@ -15,12 +15,14 @@ export async function fetchVenues(params: {
 	q: string;
 	city: string;
 	category: string;
+	date?: string;
 }) {
 	const res = await api.get<VenueCard[]>('/venues', {
 		params: {
 			q: params.q || undefined,
 			city: params.city === 'all' ? undefined : params.city,
 			category: params.category === 'all' ? undefined : params.category,
+			date: params.date || undefined,
 		},
 	});
 	return res.data;
@@ -43,6 +45,20 @@ export async function removeFavorite(token: string, venueId: string) {
 	await api.delete(`/customer/favorites/${venueId}`, {
 		headers: { Authorization: `Bearer ${token}` },
 	});
+}
+
+export async function createRecurringBooking(
+	token: string,
+	venueId: string,
+	payload: CreateBookingPayload & {
+		repeat: 'weekly' | 'monthly';
+		count: number;
+	},
+) {
+	const res = await api.post(`/venues/${venueId}/bookings/recurring`, payload, {
+		headers: { Authorization: `Bearer ${token}` },
+	});
+	return res.data;
 }
 
 export async function createBooking(
@@ -99,6 +115,17 @@ export async function createVenue(
 export async function fetchPendingBookings(token: string) {
 	const res = await api.get<ProviderBooking[]>('/provider/bookings', {
 		params: { status: 'PENDING' },
+		headers: { Authorization: `Bearer ${token}` },
+	});
+	return res.data;
+}
+
+export async function fetchProviderBookings(
+	token: string,
+	status?: 'PENDING' | 'CONFIRMED' | 'CANCELLED' | 'COMPLETED',
+) {
+	const res = await api.get<ProviderBooking[]>('/provider/bookings', {
+		params: status ? { status } : undefined,
 		headers: { Authorization: `Bearer ${token}` },
 	});
 	return res.data;

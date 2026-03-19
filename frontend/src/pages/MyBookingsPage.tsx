@@ -1,33 +1,39 @@
 import {
-    Alert,
-    Box,
-    Button,
-    Dialog,
-    DialogActions,
-    DialogContent,
-    DialogTitle,
-    Paper,
-    Rating,
-    Stack,
-    TextField,
-    Typography,
+	Alert,
+	Box,
+	Button,
+	Dialog,
+	DialogActions,
+	DialogContent,
+	DialogTitle,
+	Paper,
+	Rating,
+	Skeleton,
+	Stack,
+	TextField,
+	Typography,
 } from '@mui/material';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
 import dayjs from 'dayjs';
 import { useState } from 'react';
 import {
+	approveBooking,
 	cancelBooking,
 	createReview,
 	fetchMyBookings,
+	fetchProviderBookings,
+	rejectBooking,
 } from '../api/customer.api';
 import { useAuthStore } from '../store/auth.store';
-import { type BookingItem } from '../types/booking';
+import { type BookingItem, type ProviderBooking } from '../types/booking';
 
 export function MyBookingsPage() {
 	const token = useAuthStore((s) => s.token);
+	const user = useAuthStore((s) => s.user);
 	const navigate = useNavigate();
 	const queryClient = useQueryClient();
+	const isProvider = user?.role === 'PROVIDER';
 	const [reviewBooking, setReviewBooking] = useState<BookingItem | null>(
 		null,
 	);
@@ -44,10 +50,30 @@ export function MyBookingsPage() {
 		isError,
 		error,
 	} = useQuery({
-		queryKey: ['my-bookings', token],
-		queryFn: () => fetchMyBookings(token!),
+		queryKey: ['my-bookings', token, isProvider],
+		queryFn: async (): Promise<(BookingItem | ProviderBooking)[]> => {
+			if (isProvider) return fetchProviderBookings(token!);
+			return fetchMyBookings(token!);
+		},
 		enabled: !!token,
 		staleTime: 30_000,
+	});
+
+	const approveMutation = useMutation({
+		mutationFn: (bookingId: string) => approveBooking(token!, bookingId),
+		onSuccess: () => {
+			queryClient.invalidateQueries({ queryKey: ['my-bookings', token, true] });
+			queryClient.invalidateQueries({ queryKey: ['provider-pending-bookings', token] });
+			queryClient.invalidateQueries({ queryKey: ['notifications-unread'] });
+		},
+	});
+	const rejectMutation = useMutation({
+		mutationFn: (bookingId: string) => rejectBooking(token!, bookingId),
+		onSuccess: () => {
+			queryClient.invalidateQueries({ queryKey: ['my-bookings', token, true] });
+			queryClient.invalidateQueries({ queryKey: ['provider-pending-bookings', token] });
+			queryClient.invalidateQueries({ queryKey: ['notifications-unread'] });
+		},
 	});
 
 	const createReviewMutation = useMutation({
@@ -61,7 +87,7 @@ export function MyBookingsPage() {
 			setReviewComment('');
 			setReviewRating(5);
 			setReviewError(null);
-			queryClient.invalidateQueries({ queryKey: ['my-bookings', token] });
+			queryClient.invalidateQueries({ queryKey: ['my-bookings', token, false] });
 		},
 		onError: (e: unknown) => {
 			const message =
@@ -80,7 +106,7 @@ export function MyBookingsPage() {
 		onSuccess: () => {
 			setCancelConfirmBooking(null);
 			setCancelError(null);
-			queryClient.invalidateQueries({ queryKey: ['my-bookings', token] });
+			queryClient.invalidateQueries({ queryKey: ['my-bookings', token, false] });
 			queryClient.invalidateQueries({ queryKey: ['notifications-unread'] });
 		},
 		onError: (e: unknown) => {
@@ -95,9 +121,29 @@ export function MyBookingsPage() {
 
 	if (isLoading) {
 		return (
-			<Typography variant="body2" color="text.secondary">
-				Loading bookings...
-			</Typography>
+			<Box sx={{ width: '100%', maxWidth: 1000, mt: 2 }}>
+				<Skeleton width={180} height={40} sx={{ mb: 2 }} />
+				<Stack direction="row" spacing={1} sx={{ mb: 2 }}>
+					<Skeleton variant="rounded" width={80} height={36} />
+					<Skeleton variant="rounded" width={80} height={36} />
+				</Stack>
+				<Stack spacing={1.5}>
+					{[1, 2, 3].map((i) => (
+						<Paper key={i} variant="outlined" sx={{ p: 2 }}>
+							<Stack direction="row" justifyContent="space-between" spacing={1}>
+								<Box>
+									<Skeleton width="60%" height={28} sx={{ mb: 0.5 }} />
+									<Skeleton width="40%" height={20} />
+								</Box>
+								<Box sx={{ textAlign: 'right' }}>
+									<Skeleton width={100} height={24} sx={{ mb: 0.5 }} />
+									<Skeleton width={80} height={20} />
+								</Box>
+							</Stack>
+						</Paper>
+					))}
+				</Stack>
+			</Box>
 		);
 	}
 
@@ -115,13 +161,16 @@ export function MyBookingsPage() {
 		(booking) =>
 			booking.status !== 'CANCELLED' && dayjs(booking.endAt).isAfter(now),
 	);
-	const doneBookings = data.filter((booking) =>
-		dayjs(booking.endAt).isBefore(now),
+	const doneBookings = data.filter(
+		(booking) =>
+			booking.status === 'CANCELLED' ||
+			dayjs(booking.endAt).isBefore(now),
 	);
 	const filteredBookings = filter === 'active' ? activeBookings : doneBookings;
 
 	const hasReviewedVenue = (venueId: string) =>
-		data.some(
+		!isProvider &&
+		(data as BookingItem[]).some(
 			(b) => b.unit.venue.id === venueId && b.review != null,
 		);
 
@@ -158,11 +207,30 @@ export function MyBookingsPage() {
 			</Stack>
 
 			{filteredBookings.length === 0 ? (
-				<Typography variant="body2" color="text.secondary">
-					{filter === 'active'
-						? 'No active bookings.'
-						: 'No completed bookings.'}
-				</Typography>
+				<Paper
+					variant="outlined"
+					sx={{
+						p: 4,
+						borderRadius: 2,
+						textAlign: 'center',
+						bgcolor: 'action.hover',
+					}}
+				>
+					<Typography variant="body1" color="text.secondary" sx={{ mb: 2 }}>
+						{filter === 'active'
+							? 'No active bookings. Browse venues and make your first reservation.'
+							: 'No completed bookings yet.'}
+					</Typography>
+					{filter === 'active' && (
+						<Button
+							variant="contained"
+							size="large"
+							onClick={() => navigate({ to: '/dashboard' })}
+						>
+							Browse venues
+						</Button>
+					)}
+				</Paper>
 			) : (
 				<Stack spacing={1.5}>
 					{filteredBookings.map((booking) => {
@@ -170,9 +238,13 @@ export function MyBookingsPage() {
 						const end = dayjs(booking.endAt);
 						const isPast = end.isBefore(dayjs());
 						const canReview =
+							!isProvider &&
 							isPast &&
-							!booking.review &&
+							!(booking as BookingItem).review &&
 							!hasReviewedVenue(booking.unit.venue.id);
+						const providerBooking = isProvider
+							? (booking as ProviderBooking)
+							: null;
 
 						return (
 							<Paper key={booking.id} variant="outlined" sx={{ p: 2 }}>
@@ -188,6 +260,11 @@ export function MyBookingsPage() {
 										<Typography variant="body2" color="text.secondary">
 											{booking.unit.name} • {booking.offering.name}
 										</Typography>
+										{providerBooking && (
+											<Typography variant="body2" color="text.secondary">
+												Customer: {providerBooking.customer.email}
+											</Typography>
+										)}
 										<Stack direction="row" spacing={1} alignItems="center">
 											<Typography variant="body2" color="text.secondary">
 												{formatVenueAddress(booking.unit.venue)}
@@ -227,7 +304,7 @@ export function MyBookingsPage() {
 										</Typography>
 									</Box>
 								</Stack>
-								{filter === 'active' && (
+								{filter === 'active' && !isProvider && (
 									<Stack
 										direction="row"
 										justifyContent="flex-start"
@@ -239,7 +316,7 @@ export function MyBookingsPage() {
 											variant="outlined"
 											onClick={() => {
 												setCancelError(null);
-												setCancelConfirmBooking(booking);
+												setCancelConfirmBooking(booking as BookingItem);
 											}}
 											sx={{
 												'&:hover': {
@@ -252,7 +329,37 @@ export function MyBookingsPage() {
 										</Button>
 									</Stack>
 								)}
-								{filter === 'done' && (
+								{filter === 'active' &&
+									isProvider &&
+									providerBooking?.status === 'PENDING' && (
+										<Stack direction="row" spacing={1} sx={{ mt: 1 }}>
+											<Button
+												size="small"
+												variant="contained"
+												color="success"
+												disabled={
+													approveMutation.isPending ||
+													rejectMutation.isPending
+												}
+												onClick={() => approveMutation.mutate(booking.id)}
+											>
+												Approve
+											</Button>
+											<Button
+												size="small"
+												variant="outlined"
+												color="error"
+												disabled={
+													approveMutation.isPending ||
+													rejectMutation.isPending
+												}
+												onClick={() => rejectMutation.mutate(booking.id)}
+											>
+												Reject
+											</Button>
+										</Stack>
+									)}
+								{filter === 'done' && !isProvider && (
 									<Stack
 										direction={{ xs: 'column', sm: 'row' }}
 										justifyContent="space-between"
@@ -260,7 +367,7 @@ export function MyBookingsPage() {
 										spacing={1}
 										sx={{ mt: 1 }}
 									>
-										{booking.review ? (
+										{(booking as BookingItem).review ? (
 											<Stack
 												direction="row"
 												spacing={1}
@@ -269,13 +376,13 @@ export function MyBookingsPage() {
 												<Rating
 													size="small"
 													readOnly
-													value={booking.review.rating}
+													value={(booking as BookingItem).review!.rating}
 												/>
 												<Typography
 													variant="body2"
 													color="text.secondary"
 												>
-													{booking.review.comment ?? ''}
+													{(booking as BookingItem).review!.comment ?? ''}
 												</Typography>
 											</Stack>
 										) : null}
@@ -284,7 +391,7 @@ export function MyBookingsPage() {
 												size="small"
 												variant="outlined"
 												onClick={() => {
-													setReviewBooking(booking);
+													setReviewBooking(booking as BookingItem);
 													setReviewRating(5);
 													setReviewComment('');
 													setReviewError(null);
@@ -399,6 +506,9 @@ function formatStatus(status: string) {
 	}
 }
 
-function formatVenueAddress(venue: { city: string; address: string | null }) {
+function formatVenueAddress(venue: {
+	city: string;
+	address?: string | null;
+}) {
 	return venue.address ? `${venue.address}, ${venue.city}` : venue.city;
 }
