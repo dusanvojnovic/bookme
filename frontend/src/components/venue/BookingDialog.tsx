@@ -19,7 +19,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
 import dayjs, { type Dayjs } from 'dayjs';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { createBooking } from '../../api/customer.api';
+import { createBooking, createRecurringBooking } from '../../api/customer.api';
 import type { CreateBookingPayload } from '../../types/booking';
 import { type Offering, type Unit } from '../../types/venue';
 import {
@@ -151,6 +151,8 @@ export function BookingDialog({
 	schedules,
 	slotStepMin: venueSlotStepMin,
 	initialUnitId,
+	initialDate,
+	initialSlot,
 	onBookingSuccess,
 }: {
 	open: boolean;
@@ -162,6 +164,8 @@ export function BookingDialog({
 	schedules: { dayOfWeek: number; startTime: string; endTime: string }[];
 	slotStepMin?: number | null;
 	initialUnitId?: string;
+	initialDate?: Dayjs;
+	initialSlot?: string;
 	onBookingSuccess?: () => void;
 }) {
 	const [selectedUnitId, setSelectedUnitId] = useState('');
@@ -176,12 +180,20 @@ export function BookingDialog({
 		unitId: string;
 		offeringId: string;
 	} | null>(null);
+	const [repeatType, setRepeatType] = useState<'none' | 'weekly' | 'monthly'>('none');
+	const [repeatCount, setRepeatCount] = useState(4);
 
 	useEffect(() => {
 		if (open && initialUnitId) {
 			setSelectedUnitId(initialUnitId);
 		}
 	}, [open, initialUnitId]);
+
+	useEffect(() => {
+		if (open && initialDate) {
+			setSelectedDate(initialDate);
+		}
+	}, [open, initialDate]);
 
 	useEffect(() => {
 		if (!open) {
@@ -234,6 +246,18 @@ export function BookingDialog({
 		selectedUnitId,
 	]);
 
+	useEffect(() => {
+		if (
+			open &&
+			initialSlot &&
+			selectedDate &&
+			allSlots.includes(initialSlot) &&
+			!selectedSlot
+		) {
+			setSelectedSlot(initialSlot);
+		}
+	}, [open, initialSlot, selectedDate, allSlots, selectedSlot]);
+
 	const isSlotPast = useCallback(
 		(slot: string) => {
 			if (!selectedDate) return false;
@@ -255,8 +279,16 @@ export function BookingDialog({
 
 	const queryClient = useQueryClient();
 	const createBookingMutation = useMutation({
-		mutationFn: (payload: CreateBookingPayload) =>
-			createBooking(token!, venueId, payload),
+		mutationFn: (payload: CreateBookingPayload & { repeat?: 'weekly' | 'monthly'; count?: number }) =>
+			payload.repeat && payload.count
+				? createRecurringBooking(token!, venueId, {
+						unitId: payload.unitId,
+						offeringId: payload.offeringId,
+						startAt: payload.startAt,
+						repeat: payload.repeat,
+						count: payload.count,
+					})
+				: createBooking(token!, venueId, payload),
 		onSuccess: () => {
 			if (selectedSlot) {
 				setRequestedSlot({
@@ -268,8 +300,9 @@ export function BookingDialog({
 			}
 			setSelectedSlot(null);
 			queryClient.invalidateQueries({
-				queryKey: ['venue-bookings', venueId, dateParam],
+				queryKey: ['venue-bookings', venueId],
 			});
+			queryClient.invalidateQueries({ queryKey: ['my-bookings'] });
 			queryClient.invalidateQueries({ queryKey: ['notifications-unread'] });
 			onBookingSuccess?.();
 		},
@@ -308,11 +341,20 @@ export function BookingDialog({
 			return;
 		}
 
-		createBookingMutation.mutate({
+		const basePayload = {
 			unitId: selectedUnitId,
 			offeringId: selectedOfferingId,
 			startAt: `${dateParam}T${selectedSlot}:00`,
-		});
+		};
+		if (repeatType === 'weekly' || repeatType === 'monthly') {
+			createBookingMutation.mutate({
+				...basePayload,
+				repeat: repeatType,
+				count: Math.min(12, Math.max(2, repeatCount)),
+			});
+		} else {
+			createBookingMutation.mutate(basePayload);
+		}
 	};
 
 	const resetForm = () => {
@@ -320,6 +362,8 @@ export function BookingDialog({
 		setSelectedOfferingId('');
 		setSelectedDate(null);
 		setSelectedSlot(null);
+		setRepeatType('none');
+		setRepeatCount(4);
 		setBookingAttempted(false);
 		setBookingError(null);
 	};
@@ -525,6 +569,40 @@ export function BookingDialog({
 								<Typography variant="body2" color="error">
 									Select a time slot.
 								</Typography>
+							)}
+						</Stack>
+					)}
+
+					{selectedSlot && (
+						<Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} alignItems="center">
+							<Typography variant="body2" color="text.secondary">
+								Repeat:
+							</Typography>
+							<TextField
+								select
+								size="small"
+								value={repeatType}
+								onChange={(e) =>
+									setRepeatType(e.target.value as 'none' | 'weekly' | 'monthly')
+								}
+								sx={{ minWidth: 120 }}
+							>
+								<MenuItem value="none">One time</MenuItem>
+								<MenuItem value="weekly">Weekly</MenuItem>
+								<MenuItem value="monthly">Monthly</MenuItem>
+							</TextField>
+							{(repeatType === 'weekly' || repeatType === 'monthly') && (
+								<TextField
+									type="number"
+									size="small"
+									label="Times"
+									value={repeatCount}
+									onChange={(e) =>
+										setRepeatCount(Math.min(12, Math.max(2, parseInt(e.target.value, 10) || 2)))
+									}
+									inputProps={{ min: 2, max: 12 }}
+									sx={{ width: 80 }}
+								/>
 							)}
 						</Stack>
 					)}

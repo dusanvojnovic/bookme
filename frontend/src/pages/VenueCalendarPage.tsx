@@ -11,6 +11,8 @@ import {
 	MenuItem,
 	Paper,
 	Select,
+	Skeleton,
+	Snackbar,
 	Stack,
 	Typography,
 } from '@mui/material';
@@ -26,17 +28,28 @@ import {
 	fetchBookings,
 	fetchVenue,
 } from '../api/venue.api';
+import { BookingDialog } from '../components/venue';
+import { useAuthStore } from '../store/auth.store';
 import type { BookingSlot } from '../types/booking';
 import type { BlockSlot } from '../types/venue';
 
 export function VenueCalendarPage() {
 	const { venueId } = useParams({ from: '/venues/$venueId/calendar' });
 	const navigate = useNavigate();
+	const token = useAuthStore((s) => s.token);
+	const user = useAuthStore((s) => s.user);
 	const [selectedDate, setSelectedDate] = useState<Dayjs | null>(
 		dayjs(),
 	);
 	const [viewMode, setViewMode] = useState<'day' | 'week'>('day');
 	const [selectedUnitId, setSelectedUnitId] = useState('');
+	const [bookingDialogOpen, setBookingDialogOpen] = useState(false);
+	const [bookingInitial, setBookingInitial] = useState<{
+		unitId: string;
+		date: Dayjs;
+		slot: string;
+	} | null>(null);
+	const [loginSnackbar, setLoginSnackbar] = useState(false);
 
 	const {
 		data: venue,
@@ -133,11 +146,62 @@ export function VenueCalendarPage() {
 		}
 	}, [selectedUnitId, venue?.units]);
 
+	const isOwner =
+		!!venue && user?.role === 'PROVIDER' && user.id === venue.providerId;
+	const canBook = !!token && !isOwner;
+
+	const handleSlotClick = (
+		unitId: string,
+		date: Dayjs,
+		slot: string,
+		isBusy: boolean,
+		isBlocked: boolean,
+	) => {
+		if (isBusy || isBlocked) return;
+		if (!canBook) {
+			setLoginSnackbar(true);
+			setTimeout(() => navigate({ to: '/login' }), 1500);
+			return;
+		}
+		setBookingInitial({ unitId, date, slot });
+		setBookingDialogOpen(true);
+	};
+
+	const handleBookingSuccess = () => {
+		setBookingDialogOpen(false);
+		setBookingInitial(null);
+		navigate({ to: '/my-bookings' });
+	};
+
 	if (isLoading) {
 		return (
-			<Typography variant="body2" color="text.secondary">
-				Loading calendar...
-			</Typography>
+			<Box sx={{ width: '100%', maxWidth: 1200 }}>
+				<Paper variant="outlined" sx={{ p: 2, borderRadius: 3, mb: 2 }}>
+					<Skeleton width={200} height={36} />
+				</Paper>
+				<Paper variant="outlined" sx={{ p: 2, borderRadius: 3, mb: 2 }}>
+					<Stack direction="row" spacing={2} alignItems="center">
+						<Skeleton variant="rounded" width={120} height={40} />
+						<Skeleton variant="rounded" width={60} height={36} />
+						<Skeleton variant="rounded" width={60} height={36} />
+					</Stack>
+				</Paper>
+				<Paper variant="outlined" sx={{ p: 2, borderRadius: 3 }}>
+					<Skeleton width={120} height={28} sx={{ mb: 2 }} />
+					<Stack spacing={2}>
+						{[1, 2].map((i) => (
+							<Paper key={i} variant="outlined" sx={{ p: 2 }}>
+								<Skeleton width={150} height={24} sx={{ mb: 1 }} />
+								<Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+									{Array.from({ length: 8 }).map((_, j) => (
+										<Skeleton key={j} variant="rounded" width={64} height={28} />
+									))}
+								</Box>
+							</Paper>
+						))}
+					</Stack>
+				</Paper>
+			</Box>
 		);
 	}
 
@@ -360,22 +424,36 @@ export function VenueCalendarPage() {
 														slot,
 														slotStepMin,
 													);
+													const isAvailable = !isBusy && !isBlocked;
+													const date = selectedDate ?? dayjs();
 
 														return (
 															<Chip
 																key={`${unit.id}-${slot}`}
 																label={slot}
 																size="small"
-															color={
-																isBlocked
-																	? 'error'
-																	: isBusy
-																		? 'default'
-																		: 'success'
-															}
-															variant={
-																isBlocked || isBusy ? 'outlined' : 'filled'
-															}
+																color={
+																	isBlocked
+																		? 'error'
+																		: isBusy
+																			? 'default'
+																			: 'success'
+																}
+																variant={
+																	isBlocked || isBusy ? 'outlined' : 'filled'
+																}
+																onClick={() =>
+																	handleSlotClick(
+																		unit.id,
+																		date,
+																		slot,
+																		isBusy,
+																		!!isBlocked,
+																	)
+																}
+																sx={{
+																	cursor: isAvailable ? 'pointer' : 'default',
+																}}
 															/>
 														);
 													})
@@ -470,6 +548,8 @@ export function VenueCalendarPage() {
 															slot,
 															slotStepMin,
 														);
+														const isAvailable = !isBusy && !isBlocked;
+														const unitId = selectedUnitId || venue.units[0]?.id;
 														return (
 															<Chip
 																key={`${dayKey}-${slot}`}
@@ -487,7 +567,20 @@ export function VenueCalendarPage() {
 																		? 'outlined'
 																		: 'filled'
 																}
-																sx={{ minWidth: 64 }}
+																onClick={() =>
+																	unitId &&
+																	handleSlotClick(
+																		unitId,
+																		date,
+																		slot,
+																		isBusy,
+																		!!isBlocked,
+																	)
+																}
+																sx={{
+																	minWidth: 64,
+																	cursor: isAvailable ? 'pointer' : 'default',
+																}}
 															/>
 														);
 													})
@@ -501,6 +594,34 @@ export function VenueCalendarPage() {
 					)}
 				</Stack>
 			</Paper>
+
+			{canBook && venue && (
+				<BookingDialog
+					open={bookingDialogOpen}
+					onClose={() => {
+						setBookingDialogOpen(false);
+						setBookingInitial(null);
+					}}
+					venueId={venueId}
+					token={token}
+					units={venue.units}
+					offerings={venue.offerings ?? []}
+					schedules={venue.schedules ?? []}
+					slotStepMin={venue.slotStepMin}
+					initialUnitId={bookingInitial?.unitId}
+					initialDate={bookingInitial?.date}
+					initialSlot={bookingInitial?.slot}
+					onBookingSuccess={handleBookingSuccess}
+				/>
+			)}
+
+			<Snackbar
+				open={loginSnackbar}
+				autoHideDuration={1500}
+				onClose={() => setLoginSnackbar(false)}
+				message="Log in to book this slot"
+				anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+			/>
 		</Box>
 	);
 }
