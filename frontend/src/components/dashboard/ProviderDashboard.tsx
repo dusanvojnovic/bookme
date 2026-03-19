@@ -220,7 +220,7 @@ export function ProviderDashboard() {
 			</Stack>
 
 			<Stack spacing={2}>
-				<Paper variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
+				<Paper id="create-venue-form" variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
 					<Stack spacing={2}>
 						<Typography fontWeight={800}>New venue</Typography>
 
@@ -375,9 +375,28 @@ export function ProviderDashboard() {
 					)}
 
 					{!isLoading && data.length === 0 ? (
-						<Typography variant="body2" color="text.secondary">
-							No venues yet. Add your first venue above.
-						</Typography>
+						<Paper
+							variant="outlined"
+							sx={{
+								p: 4,
+								borderRadius: 2,
+								textAlign: 'center',
+								bgcolor: 'action.hover',
+							}}
+						>
+							<Typography variant="body1" color="text.secondary" sx={{ mb: 2 }}>
+								No venues yet. Create your first venue to start accepting bookings.
+							</Typography>
+							<Button
+								variant="contained"
+								size="large"
+								onClick={() =>
+									document.getElementById('create-venue-form')?.scrollIntoView({ behavior: 'smooth' })
+								}
+							>
+								Create your first venue
+							</Button>
+						</Paper>
 					) : (
 						<Stack spacing={2}>
 							{data.map((venue) => (

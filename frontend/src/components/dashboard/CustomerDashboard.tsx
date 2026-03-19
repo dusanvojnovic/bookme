@@ -22,6 +22,10 @@ import {
 } from '@mui/material';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
+import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
+import { DatePicker } from '@mui/x-date-pickers/DatePicker';
+import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
+import type { Dayjs } from 'dayjs';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
 	addFavorite,
@@ -43,6 +47,7 @@ export function CustomerDashboard() {
 	const [q, setQ] = useState('');
 	const [city, setCity] = useState('all');
 	const [category, setCategory] = useState('all');
+	const [date, setDate] = useState<Dayjs | null>(null);
 	const [sortBy, setSortBy] = useState('none');
 	const [minRating, setMinRating] = useState<string>('all');
 	const [favoritesOnly, setFavoritesOnly] = useState(false);
@@ -81,8 +86,14 @@ export function CustomerDashboard() {
 		isLoading,
 		isError,
 	} = useQuery({
-		queryKey: ['venues', q, city, category],
-		queryFn: () => fetchVenues({ q, city, category }),
+		queryKey: ['venues', q, city, category, date?.format('YYYY-MM-DD')],
+		queryFn: () =>
+			fetchVenues({
+				q,
+				city,
+				category,
+				date: date?.format('YYYY-MM-DD'),
+			}),
 		staleTime: 30_000,
 		placeholderData: (prev) => prev,
 	});
@@ -177,7 +188,7 @@ export function CustomerDashboard() {
 	// Reset page when filters change
 	useEffect(() => {
 		setPage(1);
-	}, [q, city, category, sortBy, minRating, favoritesOnly]);
+	}, [q, city, category, date, sortBy, minRating, favoritesOnly]);
 
 	const handleVenueClick = useCallback(
 		(v: { id: string }) => {
@@ -223,6 +234,7 @@ export function CustomerDashboard() {
 							setQInput('');
 							setCity('all');
 							setCategory('all');
+							setDate(null);
 							setSortBy('none');
 							setMinRating('all');
 							setFavoritesOnly(false);
@@ -263,6 +275,22 @@ export function CustomerDashboard() {
 							/>
 						)}
 					/>
+
+					<Box>
+						<Typography
+							variant="body2"
+							sx={{ mb: 0.75, color: 'text.secondary' }}
+						>
+							Available on date
+						</Typography>
+						<LocalizationProvider dateAdapter={AdapterDayjs}>
+							<DatePicker
+								value={date}
+								onChange={(v) => setDate(v)}
+								slotProps={{ textField: { size: 'small', fullWidth: true } }}
+							/>
+						</LocalizationProvider>
+					</Box>
 
 					<Box>
 						<Typography
@@ -504,7 +532,37 @@ export function CustomerDashboard() {
 											</Box>
 										</Paper>
 									))
-								: paginatedData.map((v) => (
+								: filteredAndSortedData.length === 0
+									? (
+										<Paper
+											variant="outlined"
+											sx={{
+												gridColumn: '1 / -1',
+												p: 4,
+												borderRadius: 2.5,
+												textAlign: 'center',
+												bgcolor: 'action.hover',
+											}}
+										>
+											<Typography variant="body1" color="text.secondary" sx={{ mb: 2 }}>
+												No venues found. Try adjusting your search or filters.
+											</Typography>
+											<Button
+												variant="contained"
+												onClick={() => {
+													setQInput('');
+													setQ('');
+													setCity('all');
+													setCategory('all');
+													setDate(null);
+													setPage(1);
+												}}
+											>
+												Clear filters
+											</Button>
+										</Paper>
+									)
+									: paginatedData.map((v) => (
 										<VenueCardItem
 											key={v.id}
 											v={v}
